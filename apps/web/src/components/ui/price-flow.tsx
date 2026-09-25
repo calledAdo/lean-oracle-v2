@@ -104,7 +104,7 @@ export function PriceFlow() {
       {EXCHANGES.map((e) => (
         <div
           key={e.name}
-          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-background px-[clamp(5px,1.4vw,12px)] py-[clamp(1px,0.7vw,6px)] text-[clamp(9px,1.6vw,14px)] leading-tight font-medium text-foreground shadow-xs"
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-card px-[clamp(5px,1.4vw,12px)] py-[clamp(1px,0.7vw,6px)] text-[clamp(9px,1.6vw,14px)] leading-tight font-medium text-foreground shadow-xs"
           style={{ left: `${(e.x / 760) * 100}%`, top: `${(e.y / 420) * 100}%` }}
         >
           {e.name}
@@ -117,7 +117,7 @@ export function PriceFlow() {
         style={{ left: `${(ORACLE.x / 760) * 100}%`, top: `${(ORACLE.y / 420) * 100}%` }}
       >
         <div className="relative flex flex-col items-center">
-          <div className="relative flex size-[clamp(52px,12vw,104px)] items-center justify-center rounded-2xl border border-border bg-background shadow-lg">
+          <div className="relative flex size-[clamp(52px,12vw,104px)] items-center justify-center rounded-2xl border border-border bg-card text-foreground shadow-lg shadow-black/30">
             <Mark className="size-1/2" />
             {animate && (
               <motion.div
@@ -140,7 +140,7 @@ export function PriceFlow() {
       >
         <div className="relative flex flex-col items-center">
           <motion.div
-            className="flex size-[clamp(52px,12vw,104px)] items-center justify-center rounded-2xl border border-border bg-foreground text-background shadow-lg"
+            className="flex size-[clamp(52px,12vw,104px)] items-center justify-center rounded-2xl border border-border bg-foreground text-background shadow-lg shadow-black/30"
             animate={animate ? { scale: [1, 1, 1.06, 1] } : undefined}
             transition={{ duration: CYCLE, times: [0, 0.78, 0.84, 0.92], repeat: Infinity }}
           >
@@ -157,13 +157,13 @@ export function PriceFlow() {
   );
 }
 
-/** The Lean Oracle mark: a signed point in time on a line that only moves forward. */
+/** The Lean Oracle mark: the letter L drawn as a chart axis, holding one price candle. */
 export function Mark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 26 26" className={className} aria-hidden="true">
-      <path d="M3 21h20" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M13 21V7" stroke="var(--signal)" strokeWidth="2.2" />
-      <circle cx="13" cy="7" r="3.2" fill="var(--signal)" />
+    <svg viewBox="0 0 44 44" className={className} fill="none" aria-hidden="true">
+      <path d="M11 5 V 39 H 39" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="20.5" y="12.5" width="8" height="15" rx="1.8" fill="var(--signal)" />
+      <path d="M24.5 7.5 V 12.5 M24.5 27.5 V 32.5" stroke="var(--signal)" strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }

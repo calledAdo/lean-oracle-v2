@@ -17,7 +17,7 @@ jobs:
   image:
     strategy:
       matrix:
-        app: [publisher, mirror]
+        app: [publisher, mirror, watchdog]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

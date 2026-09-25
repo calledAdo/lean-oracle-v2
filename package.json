@@ -7,8 +7,8 @@
     "examples/price-trigger-ts"
   ],
   "scripts": {
-    "build": "npm run build -w lean-oracle-sdk && npm run build -w lean-oracle-publisher && npm run build -w lean-oracle-mirror",
-    "test": "npm test -w lean-oracle-sdk && npm test -w lean-oracle-publisher && npm test -w lean-oracle-mirror"
+    "build": "npm run build -w lean-oracle-sdk && npm run build -w lean-oracle-publisher && npm run build -w lean-oracle-mirror && npm run build -w lean-oracle-watchdog",
+    "test": "npm test -w lean-oracle-sdk && npm test -w lean-oracle-publisher && npm test -w lean-oracle-mirror && npm test -w lean-oracle-watchdog"
   },
   "engines": {
     "node": ">=22"

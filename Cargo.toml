@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+  "contracts/common",
+  "contracts/publisher_set_type",
+  "contracts/price_feed_type",
+  "tests",
+]
+# The host-only test crate is excluded from default (RISC-V) builds.
+default-members = [
+  "contracts/common",
+  "contracts/publisher_set_type",
+  "contracts/price_feed_type",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+[profile.dev]
+panic = "abort"

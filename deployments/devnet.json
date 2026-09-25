@@ -1,0 +1,90 @@
+{
+  "network": "devnet",
+  "contracts": {
+    "priceFeedType": {
+      "current": 1,
+      "versions": {
+        "1": {
+          "codeHash": "0x4df1d506fc75810fbec2871e83e90c2ec5fdb09a00638e18c3987182c126660c",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xaf67ddcc4b2f933aab4f762dbe71718e1f0ac0f21aadf1a6bc0bbe4edb90258b",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 120744,
+          "capacity": "12080500000000",
+          "deployedAt": "2026-09-23T00:00:00.000Z"
+        }
+      }
+    },
+    "publisherSetType": {
+      "current": 1,
+      "versions": {
+        "1": {
+          "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0x6f48fb7d5f593640d65c578c07f9207c61c314ebf2f74a88a1a6c42faeeda3b9",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 115200,
+          "capacity": "11526100000000",
+          "deployedAt": "2026-09-23T00:00:00.000Z"
+        }
+      }
+    }
+  },
+  "committees": {
+    "trial": {
+      "typeScript": {
+        "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+        "hashType": "data2",
+        "args": "0x0e2e9df4ad71923cf0b598cac30525f4563733724b8572069c2bada2223fa497"
+      },
+      "typeHash": "0x5dc6640906606a71b59dc198e996389b9e3d3be86e014314663042738761d33c",
+      "codeVersion": 1,
+      "createdTx": "0xc27b77da1632f7c3ad980b037d106dc4a653a1839c8e5d9d861f4aebb5ecaf5d",
+      "createdAt": "2026-09-24T20:33:30.258Z",
+      "publishers": 1,
+      "rotations": []
+    }
+  },
+  "history": [
+    {
+      "action": "deploy:code",
+      "txHash": "0xaf67ddcc4b2f933aab4f762dbe71718e1f0ac0f21aadf1a6bc0bbe4edb90258b",
+      "at": "2026-09-23T00:00:00.000Z",
+      "detail": {
+        "contract": "priceFeedType",
+        "version": 1,
+        "codeHash": "0x4df1d506fc75810fbec2871e83e90c2ec5fdb09a00638e18c3987182c126660c"
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0x6f48fb7d5f593640d65c578c07f9207c61c314ebf2f74a88a1a6c42faeeda3b9",
+      "at": "2026-09-23T00:00:00.000Z",
+      "detail": {
+        "contract": "publisherSetType",
+        "version": 1,
+        "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e"
+      }
+    },
+    {
+      "action": "deploy:committee",
+      "txHash": "0xc27b77da1632f7c3ad980b037d106dc4a653a1839c8e5d9d861f4aebb5ecaf5d",
+      "at": "2026-09-24T20:33:30.258Z",
+      "detail": {
+        "name": "trial",
+        "typeHash": "0x5dc6640906606a71b59dc198e996389b9e3d3be86e014314663042738761d33c",
+        "publishers": 1
+      }
+    }
+  ]
+}

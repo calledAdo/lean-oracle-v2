@@ -1,0 +1,17 @@
+{
+  "network": "devnet",
+  "rpcUrl": "http://127.0.0.1:8114",
+  "feeRate": "1000",
+  "secp256k1": {
+    "codeHash": "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
+    "hashType": "type",
+    "depTxHash": "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
+    "depIndex": 0,
+    "depType": "depGroup"
+  },
+  "binaries": {
+    "priceFeedType": "target/riscv64imac-unknown-none-elf/release/price_feed_type",
+    "publisherSetType": "target/riscv64imac-unknown-none-elf/release/publisher_set_type"
+  },
+  "committees": {}
+}

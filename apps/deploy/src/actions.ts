@@ -1,0 +1,216 @@
+//! Deployment actions. Every action is a dry run unless broadcasting is enabled; a dry run builds
+//! the complete transaction (inputs, fee, change) and reports what it would spend.
+
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { ccc } from "@ckb-ccc/core";
+import { findCommitteeCell } from "lean-oracle-sdk/ckb";
+import type { ContractName, DeploymentRecord } from "lean-oracle-sdk/presets";
+import { decodePublisherSetData, isValidPublisherSetData, type Hex, type IndexedSignature } from "lean-oracle-sdk/protocol";
+import { toSignatureBundle } from "lean-oracle-sdk/publisher";
+import { bootstrapCommittee, completeFee, occupiedCapacity, rotateCommittee } from "lean-oracle-sdk/tx";
+
+import { loadConfig, REPO_ROOT, type Context } from "./context.js";
+
+const CONTRACTS: ContractName[] = ["priceFeedType", "publisherSetType"];
+const ckb = (shannons: bigint) => `${ccc.fixedPointToString(shannons)} CKB`;
+const now = () => new Date().toISOString();
+export const log = (event: string, detail: Record<string, unknown> = {}) =>
+  process.stdout.write(`${JSON.stringify({ event, ...detail }, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}\n`);
+
+/** Complete fees and send, or report the plan on a dry run. Returns the tx hash when sent. */
+async function send(ctx: Context, tx: ccc.Transaction, what: string): Promise<Hex | undefined> {
+  const result = await completeFee(tx, ctx.signer, { feeRate: ctx.feeRate });
+  if (result.status === "insufficient") throw new Error(`${what}: the deployer needs ${ckb(result.shortfall)} more`);
+  const locked = tx.outputs.slice(0, tx.outputs.length - (result.changeAdded ? 1 : 0)).reduce((sum, o) => sum + o.capacity, 0n);
+  if (!ctx.broadcast) {
+    log("dry_run", { what, locks: ckb(locked), fee: ckb(result.fee), inputs: tx.inputs.length });
+    return undefined;
+  }
+  const hash = (await ctx.signer.sendTransaction(tx)) as Hex;
+  log("sent", { what, txHash: hash, locks: ckb(locked), fee: ckb(result.fee) });
+  await ctx.client.waitTransaction(hash, 0, 300_000);
+  log("committed", { what, txHash: hash });
+  return hash;
+}
+
+async function balance(ctx: Context): Promise<bigint> {
+  return ctx.signer.getBalance();
+}
+
+/** Build the contracts (release, CKB target) and check every configured binary exists. */
+export function buildContracts(ctx: Context): void {
+  log("build", { packages: ["price_feed_type", "publisher_set_type"] });
+  execFileSync("cargo", ["build", "--release", "-p", "price_feed_type", "-p", "publisher_set_type"], {
+    cwd: REPO_ROOT,
+    stdio: ["ignore", "inherit", "inherit"],
+    env: { CC_riscv64imac_unknown_none_elf: "riscv64-elf-gcc", ...process.env },
+  });
+  for (const contract of CONTRACTS) {
+    const path = resolve(REPO_ROOT, ctx.config.binaries[contract]);
+    if (!existsSync(path) || statSync(path).size === 0) throw new Error(`build output missing: ${path}`);
+  }
+}
+
+/** Build, then deploy each contract whose binary differs from the current version (appends a version). */
+export async function deployCode(ctx: Context, options: { build?: boolean } = {}): Promise<void> {
+  if (options.build ?? true) buildContracts(ctx);
+  const lock = (await ctx.signer.getRecommendedAddressObj()).script;
+  let needed = 0n;
+  for (const contract of CONTRACTS) {
+    const binary = readFileSync(resolve(REPO_ROOT, ctx.config.binaries[contract]));
+    const codeHash = ccc.hashCkb(binary) as Hex;
+    const current = ctx.record.current(contract);
+    if (current?.code.codeHash === codeHash && (await ctx.client.getCellLive(current.code.cellDep.outPoint, false))) {
+      log("unchanged", { contract, version: current.version, codeHash });
+      continue;
+    }
+    const dataHex = ccc.hexFrom(binary) as Hex;
+    const capacity = occupiedCapacity(lock as never, undefined, dataHex);
+    needed += capacity;
+    const tx = ccc.Transaction.from({});
+    tx.addOutput({ lock, capacity }, dataHex);
+    const txHash = await send(ctx, tx, `${contract} code (${binary.length} bytes)`);
+    if (!txHash) continue;
+    const version = ctx.record.appendCodeVersion(
+      contract,
+      { codeHash, hashType: "data2", cellDep: { outPoint: { txHash, index: 0 }, depType: "code" }, bytes: binary.length, capacity: capacity.toString(), deployedAt: now() },
+      txHash,
+    );
+    log("deployed", { contract, version, codeHash, txHash });
+    publishToSdk(ctx);
+  }
+  if (!ctx.broadcast && needed > 0n) {
+    const have = await balance(ctx);
+    log("plan", { locksInTotal: ckb(needed), balance: ckb(have), enough: have > needed + 100_000_000n, next: "rerun with BROADCAST=true (or --broadcast) to send" });
+  }
+}
+
+/** Create a committee cell from `config.committees[name]`. */
+export async function deployCommittee(ctx: Context, name: string): Promise<void> {
+  const intent = ctx.config.committees[name];
+  if (!intent) throw new Error(`config/${ctx.network}.json has no committee ${name}`);
+  if (ctx.record.read().committees[name]) throw new Error(`committee ${name} already exists; use rotate:committee to change its keys`);
+  const deployment = ctx.record.deployment();
+  const pubkeys = [...new Set(intent.pubkeys.map((k) => k.toLowerCase() as Hex))].sort();
+  const networkId = intent.networkId ?? ((await ctx.client.getHeaderByNumber(0))!.hash as Hex);
+  const data = { networkId, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys } };
+  if (!isValidPublisherSetData(data)) throw new Error(`committee ${name}: needs 1 to 9 distinct compressed public keys`);
+  const { tx, typeScript, typeHash } = await bootstrapCommittee({ signer: ctx.signer, deployment, data });
+  log("committee", { name, typeHash, publishers: pubkeys.length, quorum: Math.floor((2 * pubkeys.length) / 3) + 1, networkId });
+  const txHash = await send(ctx, tx, `committee ${name}`);
+  if (!txHash) return;
+  ctx.record.addCommittee(name, {
+    typeScript,
+    typeHash,
+    codeVersion: ctx.record.current("publisherSetType")!.version,
+    createdTx: txHash,
+    createdAt: now(),
+    publishers: pubkeys.length,
+    rotations: [],
+  });
+  log("deployed", { name, typeHash, txHash });
+  publishToSdk(ctx);
+}
+
+/** Rotate a committee to `next` (hex committee data) with quorum authorization and proofs of possession. */
+export async function rotate(ctx: Context, name: string, nextFile: string, authFile: string, popFile: string): Promise<void> {
+  const deployment = ctx.record.deployment();
+  const committee = deployment.committees[name];
+  if (!committee) throw new Error(`unknown committee ${name}`);
+  const next = decodePublisherSetData(readFileSync(nextFile, "utf8").trim() as Hex);
+  const bundle = (f: string) => toSignatureBundle(JSON.parse(readFileSync(f, "utf8")) as IndexedSignature[]);
+  const tx = await rotateCommittee({ client: ctx.client, deployment, committee: committee.typeScript, next, authorization: bundle(authFile), proofOfPossession: bundle(popFile) });
+  const txHash = await send(ctx, tx, `rotate ${name}`);
+  if (!txHash) return;
+  ctx.record.addRotation(name, { setIndex: next.current.setIndex, publishers: next.current.pubkeys.length, txHash, at: now() });
+  publishToSdk(ctx);
+}
+
+/** The record, checked against the chain. */
+export async function show(ctx: Context): Promise<void> {
+  const record = ctx.record.read();
+  log("deployer", { address: await ctx.signer.getRecommendedAddress(), balance: ckb(await balance(ctx)) });
+  for (const contract of CONTRACTS) {
+    const entry = record.contracts[contract];
+    if (!entry) {
+      log("contract", { contract, deployed: false });
+      continue;
+    }
+    for (const [version, code] of Object.entries(entry.versions)) {
+      const live = Boolean(await ctx.client.getCellLive(code.cellDep.outPoint, false));
+      log("contract", { contract, version: Number(version), current: Number(version) === entry.current, codeHash: code.codeHash, live });
+    }
+  }
+  for (const [name, c] of Object.entries(record.committees)) {
+    const cell = await findCommitteeCell(ctx.client, c.typeScript);
+    log("committee", { name, typeHash: c.typeHash, live: cell?.outPoint ?? null, setIndex: cell?.data.current.setIndex, pubkeys: cell?.data.current.pubkeys });
+  }
+}
+
+/** Preflight for an action: config, key, binaries, record prerequisites, balance. */
+export async function validate(network: string, target: string, name: string | undefined, contextOf: () => Context): Promise<boolean> {
+  const lines: [boolean, string][] = [];
+  const check = (ok: boolean, message: string) => lines.push([ok, message]);
+  let ctx: Context | undefined;
+  try {
+    loadConfig(network);
+    check(true, `config/${network}.json`);
+    ctx = contextOf();
+    check(true, `deployer key (${await ctx.signer.getRecommendedAddress()})`);
+  } catch (error) {
+    check(false, error instanceof Error ? error.message : String(error));
+  }
+  if (ctx) {
+    if (target === "deploy:code") {
+      for (const contract of CONTRACTS) check(existsSync(resolve(REPO_ROOT, ctx.config.binaries[contract])), `binary ${ctx.config.binaries[contract]}`);
+    }
+    if (target === "deploy:committee" || target === "rotate:committee") {
+      const record: DeploymentRecord = ctx.record.read();
+      check(Boolean(record.contracts.priceFeedType && record.contracts.publisherSetType), "contracts deployed");
+      if (name) {
+        const intent = ctx.config.committees[name];
+        check(Boolean(intent), `committee ${name} in config`);
+        if (target === "deploy:committee") {
+          check(!record.committees[name], `committee ${name} not deployed yet`);
+          check(Boolean(intent && intent.pubkeys.length >= 1 && intent.pubkeys.length <= 9), `committee ${name}: 1 to 9 public keys`);
+        }
+      } else check(false, "--name is required");
+    }
+    try {
+      const have = await balance(ctx);
+      check(have > 0n, `balance ${ckb(have)}`);
+    } catch (error) {
+      check(false, `RPC ${ctx.config.rpcUrl}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  for (const [ok, message] of lines) process.stdout.write(`${ok ? "OK  " : "FAIL"} ${message}\n`);
+  return lines.every(([ok]) => ok);
+}
+
+/** After a broadcast on a public network, refresh the SDK presets so the next SDK build carries it. */
+function publishToSdk(ctx: Context): void {
+  if (ctx.network !== "devnet") syncPresets();
+}
+
+/** Embed public deployment records (testnet, mainnet) into the SDK presets. */
+export function syncPresets(): void {
+  const records: Record<string, DeploymentRecord> = {};
+  for (const network of ["testnet", "mainnet"]) {
+    const path = resolve(REPO_ROOT, "deployments", `${network}.json`);
+    if (existsSync(path)) records[network] = JSON.parse(readFileSync(path, "utf8")) as DeploymentRecord;
+  }
+  const out = resolve(REPO_ROOT, "packages/sdk/src/presets/deployments.generated.ts");
+  writeFileSync(
+    out,
+    `// Generated by \`npm run sync:presets -w lean-oracle-deploy\` from deployments/<network>.json.
+// Do not edit by hand.
+import type { DeploymentRecord } from "./deployment.js";
+
+export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", DeploymentRecord>> = ${JSON.stringify(records, null, 2)};
+`,
+  );
+  log("synced", { networks: Object.keys(records), file: out });
+}

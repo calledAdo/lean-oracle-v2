@@ -1,0 +1,17 @@
+{
+  "network": "mainnet",
+  "rpcUrl": "https://mainnet.ckb.dev/rpc",
+  "feeRate": "1000",
+  "binaries": {
+    "priceFeedType": "target/riscv64imac-unknown-none-elf/release/price_feed_type",
+    "publisherSetType": "target/riscv64imac-unknown-none-elf/release/publisher_set_type"
+  },
+  "committees": {
+    "majors": {
+      "pubkeys": []
+    },
+    "ckb": {
+      "pubkeys": []
+    }
+  }
+}

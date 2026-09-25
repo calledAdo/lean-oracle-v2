@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+target
+tests
+contracts
+vectors
+llmtimeline
+.git
+**/*.key
+**/local

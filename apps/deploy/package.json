@@ -1,0 +1,29 @@
+{
+  "name": "lean-oracle-deploy",
+  "version": "1.0.0-alpha.0",
+  "private": true,
+  "description": "Deploys Lean Oracle contracts and manages committee cells.",
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "test": "npm run build",
+    "deploy:code": "node dist/main.js deploy:code",
+    "deploy:committee": "node dist/main.js deploy:committee",
+    "rotate:committee": "node dist/main.js rotate:committee",
+    "show": "node dist/main.js show",
+    "validate:config": "node dist/main.js validate:config",
+    "sync:presets": "node dist/main.js sync:presets"
+  },
+  "dependencies": {
+    "@ckb-ccc/core": "1.12.5",
+    "lean-oracle-sdk": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

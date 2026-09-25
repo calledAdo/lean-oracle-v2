@@ -1,0 +1,8 @@
+[package]
+name = "lean-oracle-common"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+blake2b-ref = "0.3"
+k256 = { version = "0.13.4", default-features = false, features = ["ecdsa"] }

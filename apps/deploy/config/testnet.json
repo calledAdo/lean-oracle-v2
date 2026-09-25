@@ -1,0 +1,21 @@
+{
+  "network": "testnet",
+  "rpcUrl": "https://testnet.ckb.dev/rpc",
+  "feeRate": "1000",
+  "binaries": {
+    "priceFeedType": "target/riscv64imac-unknown-none-elf/release/price_feed_type",
+    "publisherSetType": "target/riscv64imac-unknown-none-elf/release/publisher_set_type"
+  },
+  "committees": {
+    "majors": {
+      "pubkeys": [
+        "0x03820012525034f11c7aaa4c3c4544561b3e8e9d82c0e2e187ff4d63da7db5f399"
+      ]
+    },
+    "ckb": {
+      "pubkeys": [
+        "0x03820012525034f11c7aaa4c3c4544561b3e8e9d82c0e2e187ff4d63da7db5f399"
+      ]
+    }
+  }
+}

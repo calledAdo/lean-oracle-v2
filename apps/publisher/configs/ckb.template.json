@@ -1,0 +1,72 @@
+{
+  "committee": "ckb",
+  "tickPeriodMs": 2000,
+  "observationDeadlineMs": 800,
+  "maxSigningLagMs": 6000,
+  "feeds": [
+    {
+      "symbol": "Crypto.CKB/USDT",
+      "quote": "USDT",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "method": "vwap",
+      "windowMs": 60000,
+      "maxQuoteAgeMs": 60000,
+      "maxSpreadBps": 300,
+      "minVenues": 3,
+      "maxDeviationBps": 300,
+      "minTopNotional": 20,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "CKBUSDT"
+        },
+        {
+          "venue": "gate",
+          "market": "CKB_USDT"
+        },
+        {
+          "venue": "bitget",
+          "market": "CKBUSDT"
+        },
+        {
+          "venue": "kucoin",
+          "market": "CKB-USDT"
+        },
+        {
+          "venue": "mexc",
+          "market": "CKBUSDT"
+        }
+      ]
+    },
+    {
+      "symbol": "Crypto.CKB/USDC",
+      "quote": "USDC",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "method": "vwap",
+      "windowMs": 60000,
+      "maxQuoteAgeMs": 60000,
+      "maxSpreadBps": 300,
+      "minVenues": 2,
+      "maxDeviationBps": 300,
+      "minTopNotional": 20,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "CKBUSDC"
+        },
+        {
+          "venue": "gate",
+          "market": "CKB_USDC"
+        },
+        {
+          "venue": "mexc",
+          "market": "CKBUSDC"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "name": "lean-oracle-sdk",
+  "version": "1.0.0-beta.0",
+  "description": "SDK for Lean Oracle: a pull price oracle for CKB with quorum-signed, Merkle-batched price updates.",
+  "license": "MIT",
+  "author": "calledAdo <destinyadokiye8@gmail.com>",
+  "homepage": "https://github.com/calledAdo/lean-oracle-v2/tree/main/packages/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calledAdo/lean-oracle-v2.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/calledAdo/lean-oracle-v2/issues"
+  },
+  "keywords": [
+    "ckb",
+    "nervos",
+    "oracle",
+    "price-feed",
+    "pull-oracle",
+    "lean-oracle",
+    "sdk"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
+    },
+    "./publisher": {
+      "types": "./dist/publisher/index.d.ts",
+      "default": "./dist/publisher/index.js"
+    },
+    "./mirror": {
+      "types": "./dist/mirror/index.d.ts",
+      "default": "./dist/mirror/index.js"
+    },
+    "./ckb": {
+      "types": "./dist/ckb/index.d.ts",
+      "default": "./dist/ckb/index.js"
+    },
+    "./tx": {
+      "types": "./dist/tx/index.d.ts",
+      "default": "./dist/tx/index.js"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "default": "./dist/presets/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test tests/"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0"
+  },
+  "peerDependencies": {
+    "@ckb-ccc/core": "^1.12.5"
+  },
+  "peerDependenciesMeta": {
+    "@ckb-ccc/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ckb-ccc/core": "1.12.5",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

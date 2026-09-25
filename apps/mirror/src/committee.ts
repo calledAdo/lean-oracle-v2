@@ -1,0 +1,103 @@
+//! A committee as the mirror sees it: its publisher sets over time, and full verification of
+//! finalized updates against them.
+//!
+//! The mirror keeps every set it has observed. An update signed by a set that has since been
+//! rotated out is accepted only if its tick is older than the moment the mirror first saw the
+//! newer set, so a retired (possibly compromised) set cannot add history after its retirement.
+
+import { readFileSync } from "node:fs";
+
+import {
+  decodePriceUpdate,
+  decodePublisherSetData,
+  encodePriceMessage,
+  leafHash,
+  priceUpdateSigningHash,
+  verifyProof,
+  verifyThreshold,
+  type Hex,
+  type PriceUpdate,
+  type PublisherSet,
+  type PublisherSetData,
+} from "lean-oracle-sdk/protocol";
+
+import { fetchCommitteeData } from "./chain.js";
+import type { CommitteeSourceConfig } from "./config.js";
+
+interface KnownSet {
+  set: PublisherSet;
+  /** When the mirror first saw a newer set (undefined while current). */
+  retiredAtMs?: number;
+}
+
+export class Committee {
+  readonly name: string;
+  readonly typeHash: Hex;
+  private readonly sets = new Map<number, KnownSet>();
+  private currentIndex: number | undefined;
+  private timer: NodeJS.Timeout | undefined;
+
+  constructor(
+    private readonly source: CommitteeSourceConfig,
+    private readonly log: (event: string, detail?: Record<string, unknown>) => void = () => {},
+    private readonly now: () => number = Date.now,
+  ) {
+    this.name = source.name;
+    this.typeHash = source.publisherSetTypeHash.toLowerCase() as Hex;
+  }
+
+  /** Load the committee data once, then keep it fresh from the chain. */
+  async start(): Promise<void> {
+    await this.refresh();
+    if (this.source.chain) {
+      this.timer = setInterval(() => void this.refresh().catch((error) => this.log("committee.refresh_failed", { committee: this.name, error: String(error) })), this.source.chain.refreshMs ?? 30_000);
+    }
+  }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  async refresh(): Promise<void> {
+    const data = this.source.chain
+      ? await fetchCommitteeData(this.source.chain.rpcUrl, this.source.chain.typeScript)
+      : decodePublisherSetData(readFileSync(this.source.publisherSetFile!, "utf8").trim() as Hex);
+    this.observe(data);
+  }
+
+  /** Record the committee cell's current set. */
+  observe(data: PublisherSetData): void {
+    const index = data.current.setIndex;
+    if (index === this.currentIndex) return;
+    if (this.currentIndex !== undefined && index < this.currentIndex) return;
+    if (this.currentIndex !== undefined) this.sets.get(this.currentIndex)!.retiredAtMs = this.now();
+    this.sets.set(index, { set: data.current });
+    this.currentIndex = index;
+    this.log("committee.set", { committee: this.name, setIndex: index, publishers: data.current.pubkeys.length });
+  }
+
+  get ready(): boolean {
+    return this.currentIndex !== undefined;
+  }
+
+  /**
+   * Decode and fully verify a finalized update: committee, set, quorum signatures, and a valid
+   * proof for every leaf (so any subset can be served). Throws with a reason.
+   */
+  verify(blob: Hex | Uint8Array): PriceUpdate {
+    const update = decodePriceUpdate(blob);
+    const { header } = update;
+    if (header.publisherSetTypeHash.toLowerCase() !== this.typeHash) throw new Error("another committee");
+    const known = this.sets.get(header.setIndex);
+    if (!known) throw new Error(`unknown set index ${header.setIndex}`);
+    if (known.retiredAtMs !== undefined && Number(header.publishTimeMs) >= known.retiredAtMs) throw new Error("signed by a retired set after its retirement");
+    if (update.entries.length !== header.leafCount) throw new Error("not a complete update");
+    const ids = new Set(update.entries.map((e) => e.message.feedId.toLowerCase()));
+    if (ids.size !== update.entries.length) throw new Error("duplicate feed");
+    for (const entry of update.entries) {
+      if (!verifyProof(header.merkleRoot, leafHash(encodePriceMessage(entry.message)), entry.proof)) throw new Error("bad proof");
+    }
+    if (!verifyThreshold(update.signatures, priceUpdateSigningHash(header), known.set)) throw new Error("no quorum");
+    return update;
+  }
+}

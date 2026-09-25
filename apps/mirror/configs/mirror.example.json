@@ -1,0 +1,19 @@
+{
+  "http": { "host": "0.0.0.0", "port": 7800, "trustProxy": false },
+  "dataPath": "/data/mirror.db",
+  "committees": [
+    {
+      "name": "majors",
+      "publisherSetTypeHash": "0x<committee type hash>",
+      "chain": {
+        "rpcUrl": "https://testnet.ckb.dev/rpc",
+        "typeScript": { "codeHash": "0x<publisher_set_type code hash>", "hashType": "data2", "args": "0x<type id>" }
+      },
+      "publishers": ["http://publisher-0:7701", "http://publisher-1:7701", "http://publisher-2:7701"]
+    }
+  ],
+  "rateLimit": {
+    "anonymous": { "rps": 10, "burst": 20, "maxStreams": 2 },
+    "keys": { "<api key>": { "name": "example project", "rps": 200, "burst": 400, "maxStreams": 20 } }
+  }
+}

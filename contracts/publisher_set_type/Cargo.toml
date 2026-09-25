@@ -1,0 +1,17 @@
+[package]
+name = "publisher_set_type"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ckb-std = "1.0"
+lean-oracle-common = { path = "../common" }
+blake2b-ref = "0.3"
+
+[features]
+library = []
+native-simulator = ["library", "ckb-std/native-simulator"]
+
+[[bin]]
+name = "publisher_set_type"
+path = "src/main.rs"

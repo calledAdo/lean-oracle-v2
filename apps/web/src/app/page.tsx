@@ -5,7 +5,7 @@ import { FEEDS } from "lean-oracle-sdk/presets";
 import { Button } from "@/components/ui/button";
 import { Mark, PriceFlow } from "@/components/ui/price-flow";
 import { CodeTabs } from "@/components/site/code-tabs";
-import { FeedsTable } from "@/components/site/feeds-table";
+import { FeedCatalog } from "@/components/site/feed-catalog";
 import { Ticker } from "@/components/site/ticker";
 
 const GITHUB = "https://github.com/calledAdo/lean-oracle-v2";
@@ -87,11 +87,18 @@ export default async function Home() {
 
       <main className="flex flex-1 flex-col">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pt-6 pb-16 text-center sm:px-8 sm:pt-10">
+          <a href="#feeds" className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+            <span className="relative flex size-2">
+              <span className="absolute inset-0 animate-ping rounded-full bg-[var(--proof)] opacity-60 motion-reduce:animate-none" />
+              <span className="relative size-2 rounded-full bg-[var(--proof)]" />
+            </span>
+            Live on CKB testnet
+          </a>
           <h1 className="max-w-[20ch] text-[clamp(2.3rem,5.2vw,3.9rem)] leading-[1.02] font-semibold tracking-[-0.035em] text-balance">
-            The price oracle for CKB.
+            Signed market prices, every second.
           </h1>
-          <p className="mt-5 max-w-[48ch] text-lg text-muted-foreground text-balance">
-            Live exchange prices, signed every second and checked on-chain.
+          <p className="mt-5 max-w-[52ch] text-lg text-muted-foreground text-balance">
+            Live prices from major exchanges, signed by a committee of publishers and verified inside your contract.
           </p>
           <div className="mt-8 flex gap-3">
             <Button size="lg" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<a href="/docs" />}>
@@ -151,8 +158,8 @@ export default async function Home() {
           </div>
         </Section>
 
-        <Section id="feeds" title="Live feeds" lead="Every feed is a native market pair, priced only from exchanges that trade it. These values update as the committees sign them.">
-          <FeedsTable />
+        <Section id="feeds" title="Feeds" lead="Every feed is a native market pair, priced only from exchanges that trade it. Each price is the median across them, and is signed only when enough of them report.">
+          <FeedCatalog />
         </Section>
 
         <section className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-8">

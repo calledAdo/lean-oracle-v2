@@ -133,7 +133,7 @@ export function PriceFlow() {
         </div>
       </div>
 
-      {/* CKB: where your contract reads it */}
+      {/* Your contract: where the signed price is used */}
       <div
         className="absolute -translate-x-1/2 -translate-y-1/2"
         style={{ left: `${(CKB.x / 760) * 100}%`, top: `${(CKB.y / 420) * 100}%` }}
@@ -144,10 +144,11 @@ export function PriceFlow() {
             animate={animate ? { scale: [1, 1, 1.06, 1] } : undefined}
             transition={{ duration: CYCLE, times: [0, 0.78, 0.84, 0.92], repeat: Infinity }}
           >
-            <span className="text-[clamp(13px,2.6vw,24px)] font-semibold tracking-tight">CKB</span>
+            <span className="font-mono text-[clamp(14px,2.8vw,26px)] font-medium tracking-tight">{"{ }"}</span>
           </motion.div>
           <div className="mt-2 text-center leading-tight whitespace-nowrap">
-            <div className="text-[clamp(9px,1.4vw,12px)] text-muted-foreground">BTC/USDT</div>
+            <div className="text-[clamp(10px,1.6vw,14px)] font-medium">Your contract</div>
+            <div className="mt-1 text-[clamp(9px,1.4vw,12px)] text-muted-foreground">BTC/USDT</div>
             <div className="font-mono text-[clamp(10px,1.8vw,16px)] font-medium tabular-nums">{latest ? latest.price : "…"}</div>
             <div className="text-[clamp(9px,1.4vw,12px)] text-muted-foreground">{latest ? `signed at ${latest.time} UTC` : "waiting for the mirror"}</div>
           </div>

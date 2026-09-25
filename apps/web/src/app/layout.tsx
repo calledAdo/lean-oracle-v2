@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // Fonts are bundled with the site (no request to Google at build, dev or visit time).
-import "@fontsource-variable/familjen-grotesk/wght.css";
+import "@fontsource-variable/tasa-orbiter/wght.css";
+import "@fontsource-variable/inter/wght.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./globals.css";

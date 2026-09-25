@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0
+
+First stable release of the Lean Oracle SDK; same code as 1.0.0-beta.1.
+
+- Replaces `lean-oracle-sdk` 0.x (Pyth/Hermes-based), which is deprecated. There is no
+  compatibility with 0.x; see "Migrating from 0.x" in the README.
+- Testnet: reproducible contracts (v2), committees `majors` and `ckb`, public mirror. Mainnet is not
+  deployed yet; `LeanOracleMainnetClient` throws until it is.
+- Reference consumer: `examples/price_trigger_lock` and `examples/price-trigger-ts` in the repository.
+
 ## 1.0.0-beta.1
 
 - Testnet preset points to the v2 deployment: reproducible contracts (`contracts/checksums.txt`,

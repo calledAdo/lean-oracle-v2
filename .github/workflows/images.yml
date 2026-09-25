@@ -1,0 +1,49 @@
+# Builds the publisher and mirror images (amd64 + arm64) and pushes them to GHCR:
+#   ghcr.io/calledado/lean-oracle-publisher, ghcr.io/calledado/lean-oracle-mirror
+# Tags: `edge` and `sha-<commit>` from main; `<version>` and `latest` from tags `images-v<version>`.
+name: Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["images-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    strategy:
+      matrix:
+        app: [publisher, mirror]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/calledado/lean-oracle-${{ matrix.app }}
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,prefix=sha-,enable={{is_default_branch}}
+            type=match,pattern=images-v(.*),group=1
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/images-v') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

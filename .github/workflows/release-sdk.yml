@@ -1,0 +1,35 @@
+# Publishes lean-oracle-sdk to npm when a tag `sdk-v<version>` is pushed.
+# Uses npm trusted publishing (OIDC): no token is stored in GitHub, and npm attaches provenance.
+# Prereleases (versions with a `-`, e.g. 1.0.0-beta.1) go to the `next` dist-tag, others to `latest`.
+name: Release SDK
+
+on:
+  push:
+    tags: ["sdk-v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: npm with trusted publishing support
+        run: npm install -g npm@^11.5.1
+      - run: npm ci
+      - run: npm run build -w lean-oracle-sdk
+      - run: npm test -w lean-oracle-sdk
+      - name: Tag matches package version
+        id: version
+        run: |
+          version=$(node -p "require('./packages/sdk/package.json').version")
+          [[ "sdk-v$version" == "$GITHUB_REF_NAME" ]] || { echo "::error::tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
+          if [[ "$version" == *-* ]]; then echo "tag=next" >> "$GITHUB_OUTPUT"; else echo "tag=latest" >> "$GITHUB_OUTPUT"; fi
+      - run: npm publish -w lean-oracle-sdk --access public --tag ${{ steps.version.outputs.tag }}

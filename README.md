@@ -25,13 +25,17 @@ price feed cells with them. The full design is in [docs/oracle-design.md](docs/o
 ## Build and test
 
 Contracts are pinned to Rust 1.92 because Rust 1.98 emits unsupported atomics for this CKB target.
-Build the contracts before running the tests, which load the RISC-V binaries.
+They are built **reproducibly** inside a pinned Docker image, so anyone can rebuild them and get the
+deployed code hashes ([`contracts/checksums.txt`](contracts/checksums.txt)). Build the contracts
+before running the tests, which load the RISC-V binaries.
 
 ```sh
-CC_riscv64imac_unknown_none_elf=riscv64-elf-gcc cargo build --release
+scripts/build-contracts.sh
 cargo test --workspace --target aarch64-apple-darwin
 npm install && npm test
 ```
+
+After changing contract code, record the new hashes with `scripts/build-contracts.sh --update`.
 
 After an intentional format change, regenerate the vectors with
 `LEAN_WRITE_VECTORS=1 cargo test -p tests --target aarch64-apple-darwin vectors`.

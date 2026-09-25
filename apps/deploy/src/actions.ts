@@ -40,14 +40,13 @@ async function balance(ctx: Context): Promise<bigint> {
   return ctx.signer.getBalance();
 }
 
-/** Build the contracts (release, CKB target) and check every configured binary exists. */
+/**
+ * Build the contracts reproducibly (pinned container, scripts/build-contracts.sh) and check them
+ * against contracts/checksums.txt, so every deployed code hash can be rebuilt from source.
+ */
 export function buildContracts(ctx: Context): void {
-  log("build", { packages: ["price_feed_type", "publisher_set_type"] });
-  execFileSync("cargo", ["build", "--release", "-p", "price_feed_type", "-p", "publisher_set_type"], {
-    cwd: REPO_ROOT,
-    stdio: ["ignore", "inherit", "inherit"],
-    env: { CC_riscv64imac_unknown_none_elf: "riscv64-elf-gcc", ...process.env },
-  });
+  log("build", { script: "scripts/build-contracts.sh" });
+  execFileSync(resolve(REPO_ROOT, "scripts/build-contracts.sh"), [], { cwd: REPO_ROOT, stdio: ["ignore", "inherit", "inherit"] });
   for (const contract of CONTRACTS) {
     const path = resolve(REPO_ROOT, ctx.config.binaries[contract]);
     if (!existsSync(path) || statSync(path).size === 0) throw new Error(`build output missing: ${path}`);

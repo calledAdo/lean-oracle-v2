@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-ckb-std = "1.0"
+ckb-std = { version = "1.0", default-features = false, features = ["allocator", "calc-hash", "ckb-types", "dummy-atomic"] }
 lean-oracle-common = { path = "../common" }
 
 [features]

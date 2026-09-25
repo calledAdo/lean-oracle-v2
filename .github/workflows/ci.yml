@@ -1,0 +1,47 @@
+# Tests on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Contracts (reproducible build + Rust tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build contracts in the pinned image and check contracts/checksums.txt
+        run: scripts/build-contracts.sh
+      - name: Rust tests (host + ckb-testtool against the built binaries)
+        run: cargo test --workspace --locked --target x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contracts
+          path: |
+            target/riscv64imac-unknown-none-elf/release/price_feed_type
+            target/riscv64imac-unknown-none-elf/release/publisher_set_type
+
+  node:
+    name: SDK, publisher, mirror, deploy tool
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build -w lean-oracle-deploy
+      - run: npm test
+      - name: Package checks (publint)
+        run: npx --yes publint@0.3 packages/sdk

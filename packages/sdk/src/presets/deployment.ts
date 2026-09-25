@@ -41,6 +41,8 @@ export interface CodeVersionRecord {
   bytes: number;
   capacity: string;
   deployedAt: string;
+  /** Set when the code cell was consumed; cells created under this version can no longer move. */
+  retired?: { txHash: Hex; at: string };
 }
 
 export interface CommitteeRecord extends CommitteeRef {
@@ -59,10 +61,18 @@ export interface HistoryEntry {
   detail?: Record<string, unknown>;
 }
 
+export interface RetiredCommitteeRecord extends CommitteeRecord {
+  name: string;
+  retiredAt: string;
+  reason: string;
+}
+
 export interface DeploymentRecord {
   network: NetworkName;
   contracts: Partial<Record<ContractName, { current: number; versions: Record<string, CodeVersionRecord> }>>;
   committees: Record<string, CommitteeRecord>;
+  /** Committees no longer in use (a committee cell cannot be destroyed, only abandoned). */
+  retiredCommittees?: RetiredCommitteeRecord[];
   history: HistoryEntry[];
 }
 
@@ -94,6 +104,7 @@ export function parseDeployment(value: unknown): LeanOracleDeployment {
     if (entry && "versions" in entry && entry.versions) {
       const versions: Record<number, CodeRef> = {};
       for (const [n, v] of Object.entries(entry.versions)) {
+        if (v.retired) continue;
         versions[Number(n)] = checkCode({ codeHash: v.codeHash, hashType: v.hashType, cellDep: v.cellDep, version: Number(n) }, `${name} v${n}`);
       }
       const current = versions[entry.current ?? -1];

@@ -1,6 +1,6 @@
 {
   "name": "lean-oracle-sdk",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-beta.1",
   "description": "SDK for Lean Oracle: a pull price oracle for CKB with quorum-signed, Merkle-batched price updates.",
   "license": "MIT",
   "author": "calledAdo <destinyadokiye8@gmail.com>",

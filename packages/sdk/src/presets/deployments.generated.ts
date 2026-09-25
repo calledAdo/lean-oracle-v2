@@ -7,7 +7,7 @@ export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", Deploymen
     "network": "testnet",
     "contracts": {
       "priceFeedType": {
-        "current": 1,
+        "current": 2,
         "versions": {
           "1": {
             "codeHash": "0x4df1d506fc75810fbec2871e83e90c2ec5fdb09a00638e18c3987182c126660c",
@@ -21,12 +21,30 @@ export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", Deploymen
             },
             "bytes": 120744,
             "capacity": "12080500000000",
-            "deployedAt": "2026-09-25T09:51:14.350Z"
+            "deployedAt": "2026-09-25T09:51:14.350Z",
+            "retired": {
+              "txHash": "0x0c83b234efbcd7569919045e65062e17116907d51fff943f80a0a22f085ef83a",
+              "at": "2026-09-25T12:50:08.213Z"
+            }
+          },
+          "2": {
+            "codeHash": "0xe008d1b753b1cfc69d35397ba46c34640b0cc9898de9506f605e6ac7f0b742f7",
+            "hashType": "data2",
+            "cellDep": {
+              "outPoint": {
+                "txHash": "0xe8a42d0efbe9d3ad35f847b0eb7d0c97318ac3452c72f2f565d24d8406c2d92e",
+                "index": 0
+              },
+              "depType": "code"
+            },
+            "bytes": 120952,
+            "capacity": "12101300000000",
+            "deployedAt": "2026-09-25T12:51:12.117Z"
           }
         }
       },
       "publisherSetType": {
-        "current": 1,
+        "current": 2,
         "versions": {
           "1": {
             "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
@@ -40,7 +58,25 @@ export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", Deploymen
             },
             "bytes": 115200,
             "capacity": "11526100000000",
-            "deployedAt": "2026-09-25T09:51:28.446Z"
+            "deployedAt": "2026-09-25T09:51:28.446Z",
+            "retired": {
+              "txHash": "0x3618c4bf1d186bee40add44190f35510825499888147a86eccb0dfde66331c5e",
+              "at": "2026-09-25T12:50:45.898Z"
+            }
+          },
+          "2": {
+            "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
+            "hashType": "data2",
+            "cellDep": {
+              "outPoint": {
+                "txHash": "0x80a7de5171e7b7b938eedd7125cf428aa6c71e1707c212b495b99f083cfbc2d5",
+                "index": 0
+              },
+              "depType": "code"
+            },
+            "bytes": 115416,
+            "capacity": "11547700000000",
+            "deployedAt": "2026-09-25T12:51:30.298Z"
           }
         }
       }
@@ -48,27 +84,27 @@ export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", Deploymen
     "committees": {
       "majors": {
         "typeScript": {
-          "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+          "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
           "hashType": "data2",
-          "args": "0x4b8369e45fee9e507ddb0ef893d70ee344747e03bc6896dbbaacaf7819acd1b3"
+          "args": "0x091472b13e21ffcabbb8bca728fcb5251850f76531526d19652c596724e5a38a"
         },
-        "typeHash": "0xa0789a0ca3afe54fab69126c6cac9dab73f637d9eddf4eca89e5046b91f460d9",
-        "codeVersion": 1,
-        "createdTx": "0xc2ff5aec96d4c99d7d6cbf679f9562b801c4e541002b93fb7580462fb56554a4",
-        "createdAt": "2026-09-25T09:52:34.148Z",
+        "typeHash": "0xb167a0145feff4716498c087dcc4d225bbab63661d8f8b2e854bcaba8b3bb5a8",
+        "codeVersion": 2,
+        "createdTx": "0xbe47f4efa296dfb5b6e9510d992d92992a0a83d58097b1c23c49f9422656156a",
+        "createdAt": "2026-09-25T12:51:51.167Z",
         "publishers": 1,
         "rotations": []
       },
       "ckb": {
         "typeScript": {
-          "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+          "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
           "hashType": "data2",
-          "args": "0x3f84bc579158f0ca43eca2d378590af9da9b9407c2e96e7a5f3f25e23adfe077"
+          "args": "0xa6089af0dd8bd9d9cfaaecda60ba91f097f38a92c053cefb5b30921fd41fa70a"
         },
-        "typeHash": "0xa237c793ba14b5ee08faa9276a6027e19bba321b54c56f2c641e6892b49323dc",
-        "codeVersion": 1,
-        "createdTx": "0xa8cce0934523df333cd19dfa4b7a1f8bb749e3f9f46b5060ad6592b4ddcf0464",
-        "createdAt": "2026-09-25T09:52:50.030Z",
+        "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
+        "codeVersion": 2,
+        "createdTx": "0x8d34122996e3158ec90bfd12a3aa6668c41866b9051b8a011f36c4c0f28666fb",
+        "createdAt": "2026-09-25T12:52:16.076Z",
         "publishers": 1,
         "rotations": []
       }
@@ -113,6 +149,118 @@ export const DEPLOYMENT_RECORDS: Partial<Record<"testnet" | "mainnet", Deploymen
           "typeHash": "0xa237c793ba14b5ee08faa9276a6027e19bba321b54c56f2c641e6892b49323dc",
           "publishers": 1
         }
+      },
+      {
+        "action": "retire:committee",
+        "txHash": "0xc2ff5aec96d4c99d7d6cbf679f9562b801c4e541002b93fb7580462fb56554a4",
+        "at": "2026-09-25T12:49:42.024Z",
+        "detail": {
+          "name": "majors",
+          "typeHash": "0xa0789a0ca3afe54fab69126c6cac9dab73f637d9eddf4eca89e5046b91f460d9",
+          "reason": "v1 contracts were not reproducible; replaced by committees on v2"
+        }
+      },
+      {
+        "action": "retire:committee",
+        "txHash": "0xa8cce0934523df333cd19dfa4b7a1f8bb749e3f9f46b5060ad6592b4ddcf0464",
+        "at": "2026-09-25T12:49:42.232Z",
+        "detail": {
+          "name": "ckb",
+          "typeHash": "0xa237c793ba14b5ee08faa9276a6027e19bba321b54c56f2c641e6892b49323dc",
+          "reason": "v1 contracts were not reproducible; replaced by committees on v2"
+        }
+      },
+      {
+        "action": "retire:code",
+        "txHash": "0x0c83b234efbcd7569919045e65062e17116907d51fff943f80a0a22f085ef83a",
+        "at": "2026-09-25T12:50:08.213Z",
+        "detail": {
+          "contract": "priceFeedType",
+          "version": 1
+        }
+      },
+      {
+        "action": "retire:code",
+        "txHash": "0x3618c4bf1d186bee40add44190f35510825499888147a86eccb0dfde66331c5e",
+        "at": "2026-09-25T12:50:45.898Z",
+        "detail": {
+          "contract": "publisherSetType",
+          "version": 1
+        }
+      },
+      {
+        "action": "deploy:code",
+        "txHash": "0xe8a42d0efbe9d3ad35f847b0eb7d0c97318ac3452c72f2f565d24d8406c2d92e",
+        "at": "2026-09-25T12:51:12.117Z",
+        "detail": {
+          "contract": "priceFeedType",
+          "version": 2,
+          "codeHash": "0xe008d1b753b1cfc69d35397ba46c34640b0cc9898de9506f605e6ac7f0b742f7"
+        }
+      },
+      {
+        "action": "deploy:code",
+        "txHash": "0x80a7de5171e7b7b938eedd7125cf428aa6c71e1707c212b495b99f083cfbc2d5",
+        "at": "2026-09-25T12:51:30.298Z",
+        "detail": {
+          "contract": "publisherSetType",
+          "version": 2,
+          "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1"
+        }
+      },
+      {
+        "action": "deploy:committee",
+        "txHash": "0xbe47f4efa296dfb5b6e9510d992d92992a0a83d58097b1c23c49f9422656156a",
+        "at": "2026-09-25T12:51:51.167Z",
+        "detail": {
+          "name": "majors",
+          "typeHash": "0xb167a0145feff4716498c087dcc4d225bbab63661d8f8b2e854bcaba8b3bb5a8",
+          "publishers": 1
+        }
+      },
+      {
+        "action": "deploy:committee",
+        "txHash": "0x8d34122996e3158ec90bfd12a3aa6668c41866b9051b8a011f36c4c0f28666fb",
+        "at": "2026-09-25T12:52:16.076Z",
+        "detail": {
+          "name": "ckb",
+          "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
+          "publishers": 1
+        }
+      }
+    ],
+    "retiredCommittees": [
+      {
+        "typeScript": {
+          "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+          "hashType": "data2",
+          "args": "0x4b8369e45fee9e507ddb0ef893d70ee344747e03bc6896dbbaacaf7819acd1b3"
+        },
+        "typeHash": "0xa0789a0ca3afe54fab69126c6cac9dab73f637d9eddf4eca89e5046b91f460d9",
+        "codeVersion": 1,
+        "createdTx": "0xc2ff5aec96d4c99d7d6cbf679f9562b801c4e541002b93fb7580462fb56554a4",
+        "createdAt": "2026-09-25T09:52:34.148Z",
+        "publishers": 1,
+        "rotations": [],
+        "name": "majors",
+        "retiredAt": "2026-09-25T12:49:42.024Z",
+        "reason": "v1 contracts were not reproducible; replaced by committees on v2"
+      },
+      {
+        "typeScript": {
+          "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
+          "hashType": "data2",
+          "args": "0x3f84bc579158f0ca43eca2d378590af9da9b9407c2e96e7a5f3f25e23adfe077"
+        },
+        "typeHash": "0xa237c793ba14b5ee08faa9276a6027e19bba321b54c56f2c641e6892b49323dc",
+        "codeVersion": 1,
+        "createdTx": "0xa8cce0934523df333cd19dfa4b7a1f8bb749e3f9f46b5060ad6592b4ddcf0464",
+        "createdAt": "2026-09-25T09:52:50.030Z",
+        "publishers": 1,
+        "rotations": [],
+        "name": "ckb",
+        "retiredAt": "2026-09-25T12:49:42.232Z",
+        "reason": "v1 contracts were not reproducible; replaced by committees on v2"
       }
     ]
   }

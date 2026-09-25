@@ -4,6 +4,8 @@
 //!   npm run deploy:code       -- --network testnet          (builds the contracts first; --skip-build to reuse)
 //!   npm run deploy:committee  -- --network testnet --name majors
 //!   npm run rotate:committee  -- --network testnet --name majors --next <set.hex> --authorization <sigs.json> --pop <sigs.json>
+//!   npm run retire:committee  -- --network testnet --name majors --reason "..."   (record only; cells can't be destroyed)
+//!   npm run retire:code       -- --network testnet --contract publisherSetType --version 1   (recovers the capacity)
 //!   npm run show              -- --network testnet
 //!   npm run validate:config   -- deploy:committee --network testnet --name majors
 //!   npm run sync:presets
@@ -14,7 +16,7 @@
 
 import { parseArgs } from "node:util";
 
-import { deployCode, deployCommittee, rotate, show, syncPresets, validate } from "./actions.js";
+import { deployCode, deployCommittee, retireCode, retireCommittee, rotate, show, syncPresets, validate } from "./actions.js";
 import { loadContext, loadEnv } from "./context.js";
 
 async function main(): Promise<void> {
@@ -31,6 +33,10 @@ async function main(): Promise<void> {
       pop: { type: "string" },
       broadcast: { type: "boolean", default: false },
       "skip-build": { type: "boolean", default: false },
+      contract: { type: "string" },
+      version: { type: "string" },
+      reason: { type: "string", default: "superseded" },
+      "allow-current": { type: "boolean", default: false },
     },
   });
   const ctx = () => loadContext(v.network!, v.broadcast!);
@@ -45,6 +51,13 @@ async function main(): Promise<void> {
       return deployCommittee(ctx(), need(v.name, "name"));
     case "rotate:committee":
       return rotate(ctx(), need(v.name, "name"), need(v.next, "next"), need(v.authorization, "authorization"), need(v.pop, "pop"));
+    case "retire:committee":
+      return retireCommittee(ctx(), need(v.name, "name"), v.reason!);
+    case "retire:code": {
+      const contract = need(v.contract, "contract");
+      if (contract !== "priceFeedType" && contract !== "publisherSetType") throw new Error("--contract must be priceFeedType or publisherSetType");
+      return retireCode(ctx(), contract, Number(need(v.version, "version")), v["allow-current"]);
+    }
     case "show":
       return show(ctx());
     case "validate:config":
@@ -53,7 +66,7 @@ async function main(): Promise<void> {
     case "sync:presets":
       return syncPresets();
     default:
-      process.stderr.write("usage: lean-oracle-deploy <deploy:code|deploy:committee|rotate:committee|show|validate:config|sync:presets> [--network devnet|testnet|mainnet] [--broadcast]\n");
+      process.stderr.write("usage: lean-oracle-deploy <deploy:code|deploy:committee|rotate:committee|retire:committee|retire:code|show|validate:config|sync:presets> [--network devnet|testnet|mainnet] [--broadcast]\n");
       process.exit(2);
   }
 }

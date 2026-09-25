@@ -53,6 +53,14 @@ export function buildContracts(ctx: Context): void {
   }
 }
 
+/** Code hashes from contracts/checksums.txt (the reproducible build). */
+function canonicalHashes(): Map<string, Hex> {
+  const lines = readFileSync(resolve(REPO_ROOT, "contracts/checksums.txt"), "utf8").split("\n").filter((l) => l && !l.startsWith("#"));
+  return new Map(lines.map((l) => l.split(" ") as [string, Hex]).map(([name, hash]) => [name, hash]));
+}
+
+const BINARY_NAMES: Record<ContractName, string> = { priceFeedType: "price_feed_type", publisherSetType: "publisher_set_type" };
+
 /** Build, then deploy each contract whose binary differs from the current version (appends a version). */
 export async function deployCode(ctx: Context, options: { build?: boolean } = {}): Promise<void> {
   if (options.build ?? true) buildContracts(ctx);
@@ -61,6 +69,11 @@ export async function deployCode(ctx: Context, options: { build?: boolean } = {}
   for (const contract of CONTRACTS) {
     const binary = readFileSync(resolve(REPO_ROOT, ctx.config.binaries[contract]));
     const codeHash = ccc.hashCkb(binary) as Hex;
+    // Public networks only get binaries anyone can rebuild from source.
+    const canonical = canonicalHashes().get(BINARY_NAMES[contract]);
+    if (ctx.network !== "devnet" && codeHash !== canonical) {
+      throw new Error(`${contract}: binary ${codeHash} is not the reproducible build ${canonical} (contracts/checksums.txt); run scripts/build-contracts.sh`);
+    }
     const current = ctx.record.current(contract);
     if (current?.code.codeHash === codeHash && (await ctx.client.getCellLive(current.code.cellDep.outPoint, false))) {
       log("unchanged", { contract, version: current.version, codeHash });
@@ -111,6 +124,50 @@ export async function deployCommittee(ctx: Context, name: string): Promise<void>
     rotations: [],
   });
   log("deployed", { name, typeHash, txHash });
+  publishToSdk(ctx);
+}
+
+/**
+ * Abandon a committee in the record. A committee cell cannot be destroyed on chain (its capacity
+ * stays locked); this only stops tools and the SDK from using it, and frees its name.
+ */
+export async function retireCommittee(ctx: Context, name: string, reason: string): Promise<void> {
+  const committee = ctx.record.read().committees[name];
+  if (!committee) throw new Error(`unknown committee ${name}`);
+  log("retire_committee", { name, typeHash: committee.typeHash, reason, note: "the committee cell stays on chain; its capacity is not recoverable" });
+  if (!ctx.broadcast) {
+    log("dry_run", { what: `retire committee ${name} (record only)` });
+    return;
+  }
+  ctx.record.retireCommittee(name, reason, now());
+  publishToSdk(ctx);
+}
+
+/**
+ * Consume an old code cell and recover its capacity. Cells created under that version can no longer
+ * move (their script's code is gone), so committees on it must be retired first; feed cells on it
+ * should be burned by their owners first.
+ */
+export async function retireCode(ctx: Context, contract: ContractName, version: number, allowCurrent = false): Promise<void> {
+  const record = ctx.record.read();
+  const code = record.contracts[contract]?.versions[String(version)];
+  if (!code) throw new Error(`${contract} v${version} is not in the record`);
+  if (code.retired) throw new Error(`${contract} v${version} is already retired`);
+  if (record.contracts[contract]!.current === version && !allowCurrent) {
+    throw new Error(`${contract} v${version} is current; deploy a newer version first, or pass --allow-current (the network has no usable version until deploy:code runs)`);
+  }
+  if (contract === "publisherSetType") {
+    const users = Object.entries(record.committees).filter(([, c]) => c.codeVersion === version).map(([n]) => n);
+    if (users.length) throw new Error(`committees ${users.join(", ")} use ${contract} v${version}; retire them first`);
+  }
+  const live = await ctx.client.getCellLive(code.cellDep.outPoint, false);
+  if (!live) throw new Error(`${contract} v${version} code cell is not live`);
+  const tx = ccc.Transaction.from({});
+  tx.addInput({ previousOutput: code.cellDep.outPoint });
+  const txHash = await send(ctx, tx, `retire ${contract} v${version} (recovers ${ckb(live.cellOutput.capacity)})`);
+  if (!txHash) return;
+  ctx.record.retireCode(contract, version, txHash, now(), allowCurrent);
+  log("retired", { contract, version, txHash });
   publishToSdk(ctx);
 }
 
@@ -191,7 +248,14 @@ export async function validate(network: string, target: string, name: string | u
 
 /** After a broadcast on a public network, refresh the SDK presets so the next SDK build carries it. */
 function publishToSdk(ctx: Context): void {
-  if (ctx.network !== "devnet") syncPresets();
+  if (ctx.network === "devnet") return;
+  try {
+    ctx.record.deployment();
+  } catch (error) {
+    log("sync_skipped", { reason: error instanceof Error ? error.message : String(error) });
+    return;
+  }
+  syncPresets();
 }
 
 /** Embed public deployment records (testnet, mainnet) into the SDK presets. */

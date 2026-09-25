@@ -13,7 +13,9 @@
     "rotate:committee": "node dist/main.js rotate:committee",
     "show": "node dist/main.js show",
     "validate:config": "node dist/main.js validate:config",
-    "sync:presets": "node dist/main.js sync:presets"
+    "sync:presets": "node dist/main.js sync:presets",
+    "retire:committee": "node dist/main.js retire:committee",
+    "retire:code": "node dist/main.js retire:code"
   },
   "dependencies": {
     "@ckb-ccc/core": "1.12.5",

@@ -71,11 +71,33 @@ export class RecordStore {
     });
   }
 
+  retireCode(contract: ContractName, version: number, txHash: Hex, at: string, allowCurrent = false): void {
+    this.update((record) => {
+      const entry = record.contracts[contract];
+      const code = entry?.versions[String(version)];
+      if (!entry || !code) throw new Error(`${contract} v${version} is not in the record`);
+      if (entry.current === version && !allowCurrent) throw new Error(`${contract} v${version} is current; deploy a newer version first`);
+      code.retired = { txHash, at };
+      record.history.push({ action: "retire:code", txHash, at, detail: { contract, version } });
+    });
+  }
+
+  retireCommittee(name: string, reason: string, at: string): void {
+    this.update((record) => {
+      const committee = record.committees[name];
+      if (!committee) throw new Error(`unknown committee ${name}`);
+      delete record.committees[name];
+      (record.retiredCommittees ??= []).push({ ...committee, name, retiredAt: at, reason });
+      record.history.push({ action: "retire:committee", txHash: committee.createdTx, at, detail: { name, typeHash: committee.typeHash, reason } });
+    });
+  }
+
   private update<T>(change: (record: DeploymentRecord) => T): T {
     const record = this.read();
     const result = change(record);
-    // Never write a record the SDK cannot read back.
-    if (record.contracts.priceFeedType && record.contracts.publisherSetType) parseDeployment(record);
+    // Never write a record the SDK cannot read back (except mid-migration, with no live current version).
+    const midMigration = Object.values(record.contracts).some((c) => c && c.versions[String(c.current)]?.retired);
+    if (record.contracts.priceFeedType && record.contracts.publisherSetType && !midMigration) parseDeployment(record);
     mkdirSync(dirname(this.path), { recursive: true });
     const temp = `${this.path}.${process.pid}.tmp`;
     writeFileSync(temp, `${JSON.stringify(record, null, 2)}\n`);

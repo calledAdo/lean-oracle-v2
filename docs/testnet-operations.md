@@ -4,8 +4,9 @@ Lean Oracle testnet runs on one DigitalOcean droplet (London, 1 vCPU / 1 GB + 2 
 
 - Public mirror: **https://64-227-40-35.sslip.io** (the SDK's `leanOracleTestnetPreset.mirrorUrls`).
 - Server: `root@64.227.40.35` (SSH key login). Firewall (ufw): 22, 80, 443 only.
-- Deployment record: [`deployments/testnet.json`](../deployments/testnet.json). Committees `majors` and
-  `ckb`, one publisher each (quorum 1).
+- Deployment record: [`deployments/testnet.json`](../deployments/testnet.json). Contracts v2 (reproducible,
+  [`contracts/checksums.txt`](../contracts/checksums.txt)); committees `majors` and `ckb`, one publisher
+  each (quorum 1). v1 (2026-09-25, not reproducible) is retired.
 
 ## Layout
 

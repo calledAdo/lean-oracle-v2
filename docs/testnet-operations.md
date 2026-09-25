@@ -14,9 +14,9 @@ Lean Oracle testnet runs on one DigitalOcean droplet (London, 1 vCPU / 1 GB + 2 
 
 | Service | Image | Role |
 |---|---|---|
-| `majors` | `lean-oracle-publisher:testnet` | Publisher, majors committee (1 s ticks) |
-| `ckb` | `lean-oracle-publisher:testnet` | Publisher, CKB committee (2 s ticks) |
-| `mirror` | `lean-oracle-mirror:testnet` | Verified archive and public API |
+| `majors` | `ghcr.io/calledado/lean-oracle-publisher:sha-…` | Publisher, majors committee (1 s ticks) |
+| `ckb` | `ghcr.io/calledado/lean-oracle-publisher:sha-…` | Publisher, CKB committee (2 s ticks) |
+| `mirror` | `ghcr.io/calledado/lean-oracle-mirror:sha-…` | Verified archive and public API |
 | `caddy` | `caddy:2-alpine` | HTTPS (Let's Encrypt) in front of the mirror |
 
 Only Caddy is exposed. `majors/` and `ckb/` hold each publisher's operator config, signed committee
@@ -39,22 +39,13 @@ curl -s https://64-227-40-35.sslip.io/health
 
 ## Shipping new images
 
-The droplet is x86-64 and small, so images are built on a workstation and copied over:
+Every push to `main` builds multi-arch images on GitHub (public, no login needed):
+`ghcr.io/calledado/lean-oracle-publisher` and `ghcr.io/calledado/lean-oracle-mirror`, tagged `edge`
+and `sha-<commit>`. The droplet pins a `sha-<commit>` tag, so a signer never changes version by
+surprise. To upgrade, change the tag in `compose.yaml` and pull:
 
 ```bash
-docker buildx build --platform linux/amd64 -f apps/publisher/Dockerfile -t lean-oracle-publisher:testnet --load .
-```
-
-```bash
-docker buildx build --platform linux/amd64 -f apps/mirror/Dockerfile -t lean-oracle-mirror:testnet --load .
-```
-
-```bash
-docker save lean-oracle-publisher:testnet lean-oracle-mirror:testnet | gzip | ssh root@64.227.40.35 'gunzip | docker load'
-```
-
-```bash
-ssh root@64.227.40.35 'cd /opt/lean-oracle && docker compose up -d'
+ssh root@64.227.40.35 'cd /opt/lean-oracle && sed -i "s#:sha-[0-9a-f]*#:sha-NEWSHA#" compose.yaml && docker compose pull -q && docker compose up -d'
 ```
 
 ## Changing configs

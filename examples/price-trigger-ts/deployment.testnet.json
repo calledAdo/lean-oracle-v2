@@ -1,0 +1,11 @@
+{
+  "codeHash": "0x95a09e27e023f4f84c3f0a4d0647e302d835cdd01620592d359ca7c3ad318ffa",
+  "hashType": "data2",
+  "cellDep": {
+    "outPoint": {
+      "txHash": "0xca8935487ed93dba02c3f49ce839065680b9cff872a3be7aef89729f68354e0b",
+      "index": 0
+    },
+    "depType": "code"
+  }
+}

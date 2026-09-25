@@ -20,6 +20,9 @@ price feed cells with them. The full design is in [docs/oracle-design.md](docs/o
   from publishers and serves them. Docker image ([README](apps/mirror/README.md)).
 - `apps/deploy` (`lean-oracle-deploy`): contract deployment, committee bootstrap/rotation, and the
   devnet end-to-end test ([README](apps/deploy/README.md)).
+- `examples/price_trigger_lock` + `examples/price-trigger-ts`: a reference consumer. An on-chain lock
+  that releases funds when a Lean Oracle price crosses a strike, and a script that runs the full
+  flow on testnet ([README](examples/price-trigger-ts/README.md)).
 - `deployments/<network>.json`: deployment records written by `lean-oracle-deploy`.
 
 ## Build and test

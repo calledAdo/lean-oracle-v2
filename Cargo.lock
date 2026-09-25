@@ -1458,6 +1458,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "price_trigger_lock"
+version = "0.1.0"
+dependencies = [
+ "ckb-std",
+ "lean-oracle-common",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"

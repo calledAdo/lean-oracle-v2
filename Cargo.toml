@@ -4,6 +4,7 @@ members = [
   "contracts/common",
   "contracts/publisher_set_type",
   "contracts/price_feed_type",
+  "examples/price_trigger_lock",
   "tests",
 ]
 # The host-only test crate is excluded from default (RISC-V) builds.
@@ -11,6 +12,7 @@ default-members = [
   "contracts/common",
   "contracts/publisher_set_type",
   "contracts/price_feed_type",
+  "examples/price_trigger_lock",
 ]
 
 [workspace.package]

@@ -13,14 +13,14 @@ set -euo pipefail
 IMAGE="rust:1.92-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="target/riscv64imac-unknown-none-elf/release"
-CONTRACTS=(price_feed_type publisher_set_type)
+CONTRACTS=(price_feed_type publisher_set_type price_trigger_lock)
 
 docker run --rm --platform linux/amd64 \
   -v "$ROOT":/src -w /src \
   -v lean-oracle-cargo:/cargo -e CARGO_HOME=/cargo \
   -e SOURCE_DATE_EPOCH=0 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   "$IMAGE" \
-  bash -c 'rustup show active-toolchain >/dev/null && cargo build --release --locked -p price_feed_type -p publisher_set_type; status=$?; chown -R "$HOST_UID:$HOST_GID" /src/target; exit $status'
+  bash -c 'rustup show active-toolchain >/dev/null && cargo build --release --locked -p price_feed_type -p publisher_set_type -p price_trigger_lock; status=$?; chown -R "$HOST_UID:$HOST_GID" /src/target; exit $status'
 
 cd "$ROOT"
 hash() { python3 -c 'import hashlib,sys;d=open(sys.argv[1],"rb").read();print("0x"+hashlib.blake2b(d,digest_size=32,person=b"ckb-default-hash").hexdigest(), len(d))' "$1"; }

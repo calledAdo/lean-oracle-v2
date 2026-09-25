@@ -6,3 +6,4 @@ data/
 secrets/
 *.key
 **/local/
+examples/price-trigger-ts/feed.testnet.json

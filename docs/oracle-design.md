@@ -419,6 +419,10 @@ approved committee configs (`/v1/configs`).
 
   Both work only while the signing set is still current. How and when to snapshot is the
   consumer's decision.
+- **Helpers.** `lean_oracle_common::consumer` decodes and checks a feed cell (feed, committee,
+  authenticity), checks freshness against a provable time, and rescales exponents. The reference
+  consumer [`examples/price_trigger_lock`](../examples/price_trigger_lock/src/main.rs) uses them:
+  about 38,000 cycles to read and check a price.
 - **In-transaction verification.** `lean-oracle-common` exports
   `verify_price_update(blob, feed_id, publisher_set) -> PriceMessage` for consumer scripts.
 

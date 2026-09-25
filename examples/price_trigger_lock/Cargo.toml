@@ -1,0 +1,12 @@
+[package]
+name = "price_trigger_lock"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ckb-std = { version = "1.0", default-features = false, features = ["allocator", "calc-hash", "ckb-types", "dummy-atomic"] }
+lean-oracle-common = { path = "../../contracts/common" }
+
+[[bin]]
+name = "price_trigger_lock"
+path = "src/main.rs"

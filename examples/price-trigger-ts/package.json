@@ -1,0 +1,8 @@
+{
+  "name": "lean-oracle-example-price-trigger",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end example: lock CKB that a keeper releases once a Lean Oracle price crosses a strike.",
+  "scripts": { "start": "node index.mjs" },
+  "dependencies": { "@ckb-ccc/core": "1.12.5", "lean-oracle-sdk": "*" }
+}

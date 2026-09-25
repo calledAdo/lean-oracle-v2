@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Reproducible contract build: always inside the same pinned Rust image, with the repository at
-# /src and CARGO_HOME at /cargo, so every machine produces byte-identical binaries (paths are
-# compiled into panic locations). Writes target/riscv64imac-unknown-none-elf/release/* and
+# Reproducible contract build: always inside the same pinned Rust image on linux/amd64, with the
+# repository at /src and CARGO_HOME at /cargo, so every machine produces byte-identical binaries
+# (paths are compiled into panic locations, and rustc's output differs between host
+# architectures). On Apple Silicon, enable Docker Desktop's "Use Rosetta for x86_64/amd64
+# emulation" (QEMU crashes rustc). Writes target/riscv64imac-unknown-none-elf/release/* and
 # checks them against contracts/checksums.txt unless --update is given.
 #
 #   scripts/build-contracts.sh            build and verify
@@ -13,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="target/riscv64imac-unknown-none-elf/release"
 CONTRACTS=(price_feed_type publisher_set_type)
 
-docker run --rm \
+docker run --rm --platform linux/amd64 \
   -v "$ROOT":/src -w /src \
   -v lean-oracle-cargo:/cargo -e CARGO_HOME=/cargo \
   -e SOURCE_DATE_EPOCH=0 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \

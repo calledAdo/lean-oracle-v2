@@ -9,7 +9,7 @@
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "test": "npm run build && node --test tests/"
+    "test": "npm run build && node --test 'tests/**/*.test.mjs'"
   },
   "dependencies": {
     "lean-oracle-sdk": "*",

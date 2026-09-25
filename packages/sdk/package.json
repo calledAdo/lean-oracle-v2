@@ -69,7 +69,7 @@
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test tests/"
+    "test": "npm run build && node --test 'tests/**/*.test.mjs'"
   },
   "dependencies": {
     "@noble/curves": "^1.9.7",

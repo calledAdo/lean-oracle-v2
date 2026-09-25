@@ -1,3 +1,3 @@
 # ckb_hash (the data2 code hash) and size of each contract built by scripts/build-contracts.sh
-price_feed_type 0x0c7802da1ef16fef8f9c2ceaad1b88a86b1777c30cb1467943c4183e317c1a13 120856
-publisher_set_type 0xa305a44c0a50313e6da28490f72a271e3a06f61bd11e351c61767b67f0b16cdd 115288
+price_feed_type 0xe008d1b753b1cfc69d35397ba46c34640b0cc9898de9506f605e6ac7f0b742f7 120952
+publisher_set_type 0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1 115416

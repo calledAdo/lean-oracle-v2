@@ -5,6 +5,7 @@ import { bytesToHex, hexToFixed, type BytesLike, toBytes } from "../internal/byt
 import { Reader, Writer } from "../internal/codec.js";
 import type { Hex } from "../types.js";
 import { PRICE_FEED_LEN } from "./constants.js";
+import { isPaused, trustsSet, type PublisherSetData } from "./publisherSet.js";
 import type { VerifiedPrice } from "./verify.js";
 
 export interface PriceFeedData {
@@ -20,6 +21,8 @@ export interface PriceFeedData {
   emaConf: bigint;
   sourceTimeMs: bigint;
   numPublishers: number;
+  /** Committee key set that signed the stored price. */
+  setIndex: number;
 }
 
 export function encodePriceFeedData(data: PriceFeedData): Uint8Array {
@@ -35,6 +38,7 @@ export function encodePriceFeedData(data: PriceFeedData): Uint8Array {
     .u64(data.emaConf)
     .u64(data.sourceTimeMs)
     .u8(data.numPublishers)
+    .u32(data.setIndex)
     .finish();
 }
 
@@ -53,6 +57,7 @@ export function decodePriceFeedData(bytes: BytesLike): PriceFeedData {
     emaConf: reader.u64(),
     sourceTimeMs: reader.u64(),
     numPublishers: reader.u8(),
+    setIndex: reader.u32(),
   };
 }
 
@@ -70,6 +75,7 @@ export function uninitializedPriceFeed(feedId: Hex, publisherSetTypeHash: Hex): 
     emaConf: 0n,
     sourceTimeMs: 0n,
     numPublishers: 0,
+    setIndex: 0,
   };
 }
 
@@ -92,5 +98,14 @@ export function applyVerifiedPrice(current: PriceFeedData, verified: VerifiedPri
     emaConf: m.emaConf,
     sourceTimeMs: m.sourceTimeMs,
     numPublishers: m.numPublishers,
+    setIndex: verified.header.setIndex,
   };
+}
+
+/**
+ * Whether a consumer may use the price in a feed cell now: authenticated, and the committee is not
+ * paused and still trusts the key set that signed it. Same rule as Rust `consumer::check_feed_cell`.
+ */
+export function isFeedPriceTrusted(data: PriceFeedData, committee: PublisherSetData): boolean {
+  return isInitialized(data) && !isPaused(committee) && trustsSet(committee, data.setIndex);
 }

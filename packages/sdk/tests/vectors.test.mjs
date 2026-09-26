@@ -13,8 +13,10 @@ const committee = {
   networkId: v.committee.networkId,
   governanceNonce: BigInt(v.committee.governanceNonce),
   governanceFlags: v.committee.governanceFlags,
+  minRotationIntervalS: BigInt(v.committee.minRotationIntervalS),
   current: { setIndex: v.committee.setIndex, pubkeys: v.committee.pubkeys },
 };
+const committeeHash = v.rotation.committeeTypeHash;
 const message = (m) => ({
   feedId: m.feedId,
   price: BigInt(m.price),
@@ -42,14 +44,40 @@ test("committee cell codec, hashes and keys", () => {
 
 test("rotation authorization and proof of possession match Rust signatures", () => {
   const next = p.decodePublisherSetData(v.rotation.nextBytes);
-  assert.equal(p.publisherSetUpdateHash(committee, next, p.OP_ROTATE), v.rotation.updateHash);
-  assert.equal(p.publisherSetPopHash(next), v.rotation.popHash);
-  const auth = v.update.signers.map((i) => pub.signRotation(committee, next, p.OP_ROTATE, v.committee.privateKeys[i], i));
+  assert.equal(next.previous.untilMs, BigInt(v.rotation.previousUntilMs));
+  assert.equal(p.transitionError(committee, next, p.OP_ROTATE), undefined);
+  assert.equal(p.publisherSetUpdateHash(committee, next, p.OP_ROTATE, committeeHash), v.rotation.updateHash);
+  assert.equal(p.publisherSetPopHash(next, committeeHash), v.rotation.popHash);
+  const auth = v.update.signers.map((i) => pub.signGovernance(committee, next, p.OP_ROTATE, committeeHash, v.committee.privateKeys[i], i));
   assert.equal(hex(p.encodeSignatureBundle(auth)), v.rotation.authorizationBundle);
   assert.ok(p.verifyThreshold(auth, v.rotation.updateHash, committee.current));
-  const pop = v.rotation.nextPrivateKeys.map((key, i) => pub.signProofOfPossession(next, key, i));
+  const pop = v.rotation.nextPrivateKeys.map((key, i) => pub.signProofOfPossession(next, committeeHash, key, i));
   assert.equal(hex(p.encodeSignatureBundle(pop)), v.rotation.popBundle);
   assert.ok(p.verifyAll(pop, v.rotation.popHash, next.current));
+});
+
+test("every governance operation: next state, transition rules and digest match Rust", () => {
+  const rotated = p.decodePublisherSetData(v.rotation.nextBytes);
+  const paused = p.decodePublisherSetData(v.governance.pause.nextBytes);
+  const cases = [
+    [committee, v.governance.rotateRevoke, p.OP_ROTATE_REVOKE],
+    [committee, v.governance.pause, p.OP_PAUSE],
+    [paused, v.governance.unpause, p.OP_UNPAUSE],
+    [rotated, v.governance.revokePrevious, p.OP_REVOKE_PREVIOUS],
+  ];
+  for (const [from, g, op] of cases) {
+    const next = p.decodePublisherSetData(g.nextBytes);
+    assert.equal(hex(p.encodePublisherSetData(next)), g.nextBytes);
+    assert.equal(p.transitionError(from, next, op), undefined, `op ${op}`);
+    assert.equal(p.publisherSetUpdateHash(from, next, op, committeeHash), g.updateHash);
+  }
+  // Digests are bound to the committee: another cell gets another digest.
+  assert.notEqual(p.publisherSetUpdateHash(committee, paused, p.OP_PAUSE, `0x${"55".repeat(32)}`), v.governance.pause.updateHash);
+  // Wrong operation for a state change is refused.
+  assert.ok(p.transitionError(committee, paused, p.OP_UNPAUSE));
+  assert.ok(p.transitionError(committee, rotated, p.OP_ROTATE_REVOKE));
+  assert.ok(p.needsProofOfPossession(p.OP_ROTATE_REVOKE) && !p.needsProofOfPossession(p.OP_PAUSE));
+  assert.ok(p.needsRotationInterval(p.OP_ROTATE) && !p.needsRotationInterval(p.OP_ROTATE_REVOKE));
 });
 
 test("price update: messages, Merkle, header, signatures and blob", () => {

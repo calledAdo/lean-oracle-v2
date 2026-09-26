@@ -36,6 +36,23 @@ test("rejects every failure mode", () => {
   assert.equal(reason(() => p.verifyPriceUpdate(retimed, btc, setHash, committee)), "Signature");
 });
 
+test("previous set verifies ticks before the switch until revoked; stored prices follow", () => {
+  const update = p.decodePriceUpdate(v.update.blob);
+  const tick = update.header.publishTimeMs;
+  const next = { ...committee, governanceNonce: committee.governanceNonce + 1n, current: { setIndex: committee.current.setIndex + 1, pubkeys: committee.current.pubkeys } };
+  const withPrevious = (untilMs) => ({ ...next, previous: { set: committee.current, untilMs } });
+  assert.equal(p.verifyPriceUpdate(update, btc, setHash, withPrevious(tick + 1n)).header.setIndex, committee.current.setIndex);
+  assert.equal(reason(() => p.verifyPriceUpdate(update, btc, setHash, withPrevious(tick))), "SetIndex");
+  assert.equal(reason(() => p.verifyPriceUpdate(update, btc, setHash, next)), "SetIndex");
+
+  const stored = p.applyVerifiedPrice(p.uninitializedPriceFeed(btc, setHash), p.verifyPriceUpdate(update, btc, setHash, committee));
+  assert.equal(stored.setIndex, committee.current.setIndex);
+  assert.ok(p.isFeedPriceTrusted(stored, committee));
+  assert.ok(p.isFeedPriceTrusted(stored, withPrevious(tick + 1n)));
+  assert.equal(p.isFeedPriceTrusted(stored, next), false);
+  assert.equal(p.isFeedPriceTrusted(stored, { ...committee, governanceFlags: p.GOVERNANCE_PAUSED }), false);
+});
+
 test("decoders reject trailing bytes and bad shapes", () => {
   assert.throws(() => p.decodePriceUpdate(v.update.blob + "00"), p.DecodeError);
   assert.throws(() => p.decodePublisherSetData(v.committee.bytes + "00"), p.DecodeError);

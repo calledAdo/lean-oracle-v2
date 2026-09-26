@@ -43,6 +43,8 @@ export const CONTRACT_ERRORS: Readonly<Record<number, string>> = {
   62: "PUBLISHER_SET_AUTH",
   63: "PUBLISHER_SET_POP",
   64: "PUBLISHER_SET_OPERATION",
+  65: "PUBLISHER_SET_INTERVAL",
+  66: "PUBLISHER_SET_CELL",
   80: "FEED_DATA_MALFORMED",
   81: "FEED_ID_MISMATCH",
   82: "FEED_CREATION_NONZERO",
@@ -55,6 +57,7 @@ export const CONTRACT_ERRORS: Readonly<Record<number, string>> = {
   89: "UPDATE_SET",
   90: "UPDATE_SIGNATURE",
   91: "UPDATE_MISMATCH",
+  92: "FEED_LEADER",
 };
 
 /** Name of an on-chain script error code, e.g. `83 → "FEED_NOT_FORWARD"`. */

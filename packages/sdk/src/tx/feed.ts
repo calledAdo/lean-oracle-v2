@@ -63,31 +63,74 @@ export interface UpdateFeedCellResult {
   after: PriceFeedData;
 }
 
+export interface UpdateFeedCellsParams {
+  client: ccc.Client;
+  deployment: LeanOracleDeployment;
+  /** Feed cells of one committee to move forward together. */
+  feedTypes: Script[];
+  /** One finalized update (blob or decoded) containing every one of these feeds. */
+  update: BytesLike | PriceUpdate;
+}
+
+export interface UpdateFeedCellsResult {
+  tx: ccc.Transaction;
+  feeds: { feedType: Script; verified: VerifiedPrice; before: PriceFeedData; after: PriceFeedData }[];
+}
+
+/**
+ * Move several feed cells of one committee forward to the same update, in one transaction. The feed
+ * cells are inputs 0..n-1; input 0 is the leader and its witness carries the only blob (every
+ * requested feed with its proof), so the committee's signatures are checked once on chain. Each price
+ * is verified against the live committee cell first, so a transaction the contract would reject is
+ * never built. Every feed cell's lock must be satisfied by the caller's signer.
+ */
+export async function updateFeedCells(p: UpdateFeedCellsParams): Promise<UpdateFeedCellsResult> {
+  if (p.feedTypes.length === 0) throw new Error("no feed cells given");
+  const decoded = typeof p.update === "string" || p.update instanceof Uint8Array ? decodePriceUpdate(p.update) : p.update;
+  const cells = await Promise.all(
+    p.feedTypes.map(async (feedType) => {
+      const feed = await getFeedCell(p.client, feedType);
+      if (!feed) throw new Error("feed cell not found");
+      return { feedType, feed };
+    }),
+  );
+  const committeeHash = cells[0]!.feed.data.publisherSetTypeHash.toLowerCase();
+  if (cells.some((c) => c.feed.data.publisherSetTypeHash.toLowerCase() !== committeeHash)) {
+    throw new Error("all feed cells in one transaction must trust the same committee");
+  }
+  const ids = cells.map((c) => c.feed.data.feedId.toLowerCase());
+  if (new Set(ids).size !== ids.length) throw new Error("each feed may appear once per transaction");
+  const committeeCell = await findCommitteeCellByHash(p.client, p.deployment, cells[0]!.feed.data.publisherSetTypeHash);
+
+  const tx = ccc.Transaction.from({});
+  const codeDeps = new Map<string, ReturnType<typeof cellDep>>();
+  const feeds = cells.map(({ feedType, feed }) => {
+    const verified = verifyPriceUpdate(decoded, feed.data.feedId, feed.data.publisherSetTypeHash, committeeCell.data);
+    if (verified.header.publishTimeMs <= feed.data.publishTimeMs) {
+      throw new Error(`update at ${verified.header.publishTimeMs} is not newer than feed ${feed.data.feedId} (${feed.data.publishTimeMs})`);
+    }
+    const after = applyVerifiedPrice(feed.data, verified);
+    tx.addInput(ccc.CellInput.from({ previousOutput: feed.cell.outPoint }));
+    tx.addOutput(feed.cell.cellOutput, ccc.hexFrom(encodePriceFeedData(after)));
+    // Each feed cell keeps the contract version it was created under.
+    const code = codeRefFor(p.deployment, "priceFeedType", feed.cell.cellOutput.type!.codeHash as Hex);
+    codeDeps.set(code.codeHash, cellDep(code.cellDep));
+    return { feedType, verified, before: feed.data, after };
+  });
+  tx.addCellDeps(...codeDeps.values(), cellDep(committeeCell.cellDep));
+  setInputType(tx, 0, encodeFeedWitness(encodePriceUpdate(selectFeeds(decoded, cells.map((c) => c.feed.data.feedId)))));
+  return { tx, feeds };
+}
+
 /**
  * Move a feed cell forward to `update`. Verifies the update against the live committee cell first,
  * so a transaction that the contract would reject is never built. The feed cell is input 0; its
  * lock must be satisfied by the caller's signer.
  */
 export async function updateFeedCell(p: UpdateFeedCellParams): Promise<UpdateFeedCellResult> {
-  const feed = await getFeedCell(p.client, p.feedType);
-  if (!feed) throw new Error("feed cell not found");
-  const committeeCell = await findCommitteeCellByHash(p.client, p.deployment, feed.data.publisherSetTypeHash);
-  const decoded = typeof p.update === "string" || p.update instanceof Uint8Array ? decodePriceUpdate(p.update) : p.update;
-  const verified = verifyPriceUpdate(decoded, feed.data.feedId, feed.data.publisherSetTypeHash, committeeCell.data);
-  if (verified.header.publishTimeMs <= feed.data.publishTimeMs) {
-    throw new Error(`update at ${verified.header.publishTimeMs} is not newer than the cell (${feed.data.publishTimeMs})`);
-  }
-  const after = applyVerifiedPrice(feed.data, verified);
-  const dataHex = ccc.hexFrom(encodePriceFeedData(after));
-
-  const tx = ccc.Transaction.from({});
-  tx.addInput(ccc.CellInput.from({ previousOutput: feed.cell.outPoint }));
-  tx.addOutput(feed.cell.cellOutput, dataHex);
-  // The feed cell keeps the contract version it was created under.
-  const code = codeRefFor(p.deployment, "priceFeedType", feed.cell.cellOutput.type!.codeHash as Hex);
-  tx.addCellDeps(cellDep(code.cellDep), cellDep(committeeCell.cellDep));
-  setInputType(tx, 0, encodeFeedWitness(encodePriceUpdate(selectFeeds(decoded, [feed.data.feedId]))));
-  return { tx, verified, before: feed.data, after };
+  const { tx, feeds } = await updateFeedCells({ client: p.client, deployment: p.deployment, feedTypes: [p.feedType], update: p.update });
+  const { verified, before, after } = feeds[0]!;
+  return { tx, verified, before, after };
 }
 
 /** Consume a feed cell and return its capacity (the lock decides who may). */

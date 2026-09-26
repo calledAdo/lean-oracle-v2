@@ -6,7 +6,7 @@ import type { Hex } from "../types.js";
 import { GOVERNANCE_PAUSED } from "./constants.js";
 import { leafHash, verifyProof } from "./merkle.js";
 import { decodePriceUpdate, encodePriceMessage, priceUpdateSigningHash, type PriceMessage, type PriceUpdate, type PriceUpdateHeader } from "./priceUpdate.js";
-import { activeSet, type PublisherSetData } from "./publisherSet.js";
+import { setFor, type PublisherSetData } from "./publisherSet.js";
 import { verifyThreshold } from "./signatures.js";
 
 export interface VerifiedPrice {
@@ -16,7 +16,7 @@ export interface VerifiedPrice {
 
 /**
  * Verify one feed's price in an update against the committee cell's current data.
- * Current-set-only. Throws `VerifyError` with the same reasons as the Rust verifier.
+ * Accepts the current set, or the previous set for ticks before its switch. Throws `VerifyError` with the same reasons as the Rust verifier.
  */
 export function verifyPriceUpdate(
   update: BytesLike | PriceUpdate,
@@ -41,8 +41,8 @@ export function verifyPriceUpdate(
     throw new VerifyError("PublisherSet", "update was signed for a different committee");
   }
   if ((publisherSet.governanceFlags & GOVERNANCE_PAUSED) !== 0) throw new VerifyError("Paused");
-  const set = activeSet(publisherSet, decoded.header.setIndex);
-  if (!set) throw new VerifyError("SetIndex", `set index ${decoded.header.setIndex} is not the current set`);
+  const set = setFor(publisherSet, decoded.header.setIndex, decoded.header.publishTimeMs);
+  if (!set) throw new VerifyError("SetIndex", `set index ${decoded.header.setIndex} may not sign tick ${decoded.header.publishTimeMs}`);
   if (!verifyThreshold(decoded.signatures, priceUpdateSigningHash(decoded.header), set)) throw new VerifyError("Signature");
   return { header: decoded.header, message: entry.message };
 }

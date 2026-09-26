@@ -36,14 +36,24 @@ export function toSignatureBundle(signatures: IndexedSignature[]): SignatureBund
   return bundle;
 }
 
-/** A current publisher's signature authorizing rotation `current → next`. */
-export function signRotation(current: PublisherSetData, next: PublisherSetData, operation: number, privateKey: Hex, publisherIndex: number): IndexedSignature {
-  return { publisherIndex, signature: signDigest(publisherSetUpdateHash(current, next, operation), privateKey) };
+/**
+ * A current publisher's authorization of governance operation `current → next` (rotate, pause, unpause,
+ * revoke) on the committee cell with type hash `committeeTypeHash`.
+ */
+export function signGovernance(
+  current: PublisherSetData,
+  next: PublisherSetData,
+  operation: number,
+  committeeTypeHash: Hex,
+  privateKey: Hex,
+  publisherIndex: number,
+): IndexedSignature {
+  return { publisherIndex, signature: signDigest(publisherSetUpdateHash(current, next, operation, committeeTypeHash), privateKey) };
 }
 
-/** A next-set publisher's proof of possession of its key. */
-export function signProofOfPossession(next: PublisherSetData, privateKey: Hex, publisherIndex: number): IndexedSignature {
-  return { publisherIndex, signature: signDigest(publisherSetPopHash(next), privateKey) };
+/** A next-set publisher's proof of possession of its key, bound to one committee cell. */
+export function signProofOfPossession(next: PublisherSetData, committeeTypeHash: Hex, privateKey: Hex, publisherIndex: number): IndexedSignature {
+  return { publisherIndex, signature: signDigest(publisherSetPopHash(next, committeeTypeHash), privateKey) };
 }
 
 /** Sign this publisher's observation for a tick. */

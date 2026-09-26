@@ -1,0 +1,41 @@
+---
+title: Feed policy
+description: How feeds are added, changed and retired, and what stays fixed.
+---
+
+## What never changes
+
+- **A feed's ID.** It is derived from the symbol and never reused.
+- **A feed's meaning.** `Crypto.BTC/USDT` is always a spot price of BTC in USDT from native markets.
+  A different meaning, such as a time-weighted average, gets a new symbol
+  (for example `Crypto.CKB/USDT.TWAP60`).
+- **A feed's exponent.** `-8` for majors and USDT/USD, `-10` for CKB pairs.
+
+## What can change
+
+Exchanges, minimum exchange counts, spreads, outlier limits and other methodology settings. Changes go
+through a new version of the committee config, which a quorum of publishers must sign and which takes
+effect at a stated tick. Every signed update carries the hash of the config that produced it, so any
+price can be traced to its exact settings.
+
+## Adding a feed
+
+A pair becomes a feed only if enough independent exchanges trade it natively:
+
+- at least two exchanges must agree on every price;
+- one more market than required must be listed, so one exchange failing does not stop the feed;
+- each exchange appears once, with a public order book API, real volume and depth.
+
+Adding a feed needs no transaction and doesn't affect existing feeds. USDC/USD is not a feed yet
+because only two exchanges trade it directly, one short of these rules.
+
+## Retiring a feed
+
+A retired feed is simply no longer included in updates. Existing feed cells keep their last price and
+can be burned. Retirements will be announced in the [changelog](/docs/reference/changelog) ahead of
+time on mainnet.
+
+## Missing ticks
+
+If fewer than the required exchanges are healthy in a tick, that tick carries no price for the feed.
+The mirror's `at` endpoint then returns the next tick that does. Plan a fallback for settlement.

@@ -2,5 +2,5 @@
   "title": "Reference",
   "description": "Feeds, deployments and APIs",
   "root": true,
-  "pages": ["feeds", "networks", "mirror-api", "sdk", "rust", "formats", "errors", "changelog"]
+  "pages": ["networks", "mirror-api", "sdk", "rust", "formats", "errors", "changelog"]
 }

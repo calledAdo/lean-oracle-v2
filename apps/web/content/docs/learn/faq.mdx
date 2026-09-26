@@ -1,0 +1,56 @@
+---
+title: FAQ
+description: Common questions about Lean Oracle.
+---
+
+### Is Lean Oracle on mainnet?
+
+Not yet. It runs on CKB testnet with a single publisher. Mainnet follows once independent publishers
+have joined and the contracts are audited.
+
+### Do I have to update the feed cell myself?
+
+Yes, or whoever your cell's lock allows. Nothing updates your cell for you. Most applications
+update it in the same transaction that uses the price.
+
+### Can I read someone else's feed cell?
+
+Yes, as a cell dep, but check its committee type hash, and remember they control when it updates.
+Owning your cell is simpler and safer.
+
+### How fresh is a price?
+
+A new update is signed every second (two for CKB). How old the price in your cell is depends on when
+it was last updated. Your contract decides what is fresh enough; see
+[Check freshness](/docs/build/guides/freshness).
+
+### Why are BTC/USD and BTC/USDT different feeds?
+
+They are priced from different markets and differ when USDT is off its peg. See
+[native pairs](/docs/feeds#native-pairs-usd-usdt-and-usdc-are-different-feeds).
+
+### What happens if the mirror goes down?
+
+Your contract keeps its last price, and your application can't fetch new updates until a mirror is
+back. Configure several mirror URLs, or run your own.
+
+### What happens if publishers go down?
+
+Updates continue as long as a quorum is up. If fewer are up, no new updates are signed until they
+return; your freshness check stops your contract from using an old price.
+
+### Can a mirror or relayer manipulate prices?
+
+No. They can only choose among genuinely signed updates, and your cell only moves forward. Freshness
+checks close the remaining gap: someone choosing a slightly older signed update.
+
+### What does it cost?
+
+Lean Oracle is free. You pay CKB storage for your feed cell and ordinary transaction fees. See
+[Costs](/docs/learn/costs).
+
+### How is this different from Pyth?
+
+The model is similar: a pull oracle with signed updates served by a gateway. The differences are that
+Lean Oracle is built for CKB's cell model, each project owns its own feed cell, and prices come from
+Lean Oracle's own publisher committees rather than Pyth's publishers.

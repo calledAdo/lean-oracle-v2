@@ -1,0 +1,23 @@
+{
+  "title": "Feeds",
+  "description": "Every feed, committee and policy",
+  "root": true,
+  "pages": [
+    "index",
+    "committees",
+    "policy",
+    "---Feeds---",
+    "btc-usd",
+    "btc-usdt",
+    "btc-usdc",
+    "eth-usd",
+    "eth-usdt",
+    "eth-usdc",
+    "sol-usd",
+    "sol-usdt",
+    "sol-usdc",
+    "usdt-usd",
+    "ckb-usdt",
+    "ckb-usdc"
+  ]
+}

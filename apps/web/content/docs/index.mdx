@@ -7,21 +7,36 @@ Lean Oracle aggregates prices from leading exchanges. A committee of publishers 
 and your CKB application brings a signed price on chain whenever it needs one. The chain checks the
 signatures, so no relayer or server has to be trusted.
 
+New here? Start with [What is a pull oracle?](/docs/learn/pull-oracle) and
+[How Lean Oracle works](/docs/learn/how-it-works). Then pick your path.
+
+## Pick your path
+
 <Cards>
-  <Card title="Learn how it works" href="/docs/learn">
-    What a pull oracle is, and how a price travels from an exchange to your contract.
+  <Card title="I'm building an application" href="/docs/build/quick-start">
+    TypeScript. Read verified prices, create a feed cell and keep it updated.
+    Then: Quick start → Update a feed cell → Best practices.
   </Card>
-  <Card title="Quick start" href="/docs/build/quick-start">
-    Install the SDK, read a verified price and put it on testnet in a few minutes.
+  <Card title="I'm writing a CKB contract" href="/docs/build/guides/read-in-contract">
+    Rust. Read and check a feed cell, prove freshness, settle at an exact time.
+    Then: Read a price → Check freshness → Tutorial.
   </Card>
-  <Card title="Price feeds" href="/docs/reference/feeds">
-    Every feed with its ID, exponent, exchanges and live testnet price.
+  <Card title="I'm choosing a feed" href="/docs/feeds">
+    Every feed with its exchanges, settings, live value and IDs.
+    Then: Feed pages → Committees → Feed policy.
   </Card>
-  <Card title="Networks" href="/docs/reference/networks">
-    Code hashes, cell deps and committee type hashes for each network.
+  <Card title="I'm evaluating the oracle" href="/docs/learn/trust-model">
+    What you trust, who the publishers are, security and costs.
+    Then: Trust model → Publishers → Security.
+  </Card>
+  <Card title="I want to run a publisher" href="/docs/operate/publishers">
+    Requirements and the path to joining a committee.
+  </Card>
+  <Card title="I want to run a mirror" href="/docs/operate">
+    Serve signed updates yourself, without rate limits.
   </Card>
 </Cards>
 
 <Callout title="Testnet">
-  Lean Oracle is live on CKB testnet. It is not deployed on mainnet yet.
+  Lean Oracle is live on CKB testnet with a single publisher. It is not deployed on mainnet yet.
 </Callout>

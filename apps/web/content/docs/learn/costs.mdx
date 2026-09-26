@@ -1,0 +1,39 @@
+---
+title: Costs
+description: What using Lean Oracle costs in CKB storage, cycles and fees.
+---
+
+Lean Oracle charges no fees. You pay only CKB's own costs.
+
+## Storage
+
+| Item | Capacity | Returned |
+|---|---|---|
+| A feed cell | about 280 CKB | when you burn it |
+
+CKB charges one CKB per byte a cell occupies; the feed cell's type script args (64 bytes) and data
+(125 bytes) make up most of it. The capacity is locked, not spent.
+
+## Cycles
+
+| Operation | Cycles |
+|---|---|
+| Update a feed cell, 1 signature (testnet today) | about 9 million |
+| Update a feed cell, 3 of 4 signatures | about 24 million |
+| Update a feed cell, 7 of 9 signatures | about 56 million |
+| Read and check a feed cell in your script | about 38,000 |
+| Verify an update inside your own script | about 8 million per signature |
+
+CKB's per-transaction cycle limit is far above these. Updating k feed cells in one transaction checks
+the signatures k times.
+
+## Transaction fees
+
+Fees are set by transaction size and the network fee rate. A feed update is about 1 KB, so at the
+typical rate of 1,000 shannons per KB it costs about 0.00001 CKB. `completeFee` uses the network's
+current rate by default.
+
+## Mirror access
+
+The public mirror is free, limited to 10 requests per second per IP address. Higher limits are
+available with an API key on request, or by running your own mirror.

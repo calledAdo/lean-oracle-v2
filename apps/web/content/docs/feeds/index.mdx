@@ -1,0 +1,51 @@
+---
+title: Price feeds
+description: Every feed Lean Oracle publishes, how feeds are named and grouped, and how to choose one.
+---
+
+Lean Oracle publishes 12 feeds on testnet, signed by two committees. Select a feed for its full
+page: live value, identifiers, methodology settings, the exact markets it uses, and code.
+
+<FeedTable />
+
+## How feeds are named
+
+A symbol is `Crypto.<BASE>/<QUOTE>`, for example `Crypto.BTC/USDT`: the price of one BTC in USDT.
+Its **feed ID** is `ckb_hash("LEAN/FEED/V1" || symbol)`. The SDK accepts either anywhere a feed is
+expected. IDs are permanent: a feed's ID never changes, even when its exchanges or settings do.
+
+## Native pairs: USD, USDT and USDC are different feeds
+
+Every feed is priced only from markets that trade **exactly** that pair. BTC/USD comes from Coinbase,
+Kraken and Bitstamp; BTC/USDT from seven USDT markets; BTC/USDC from eight USDC markets. Publishers
+never convert one currency to another.
+
+This matters when a stablecoin loses its peg: BTC/USDT then really shows BTC's price in USDT, and
+USDT/USD shows the depeg. To get a USD price from a USDT feed, multiply by
+[USDT/USD](/docs/feeds/usdt-usd) yourself (see [Derive cross rates](/docs/build/guides/cross-rates)).
+
+## Categories
+
+| Category | Feeds | What to expect |
+|---|---|---|
+| Deep liquidity | BTC, ETH, SOL in /USD, /USDT, /USDC | Many large exchanges, tight confidence, one-second updates |
+| Stablecoin rate | USDT/USD | Stays near 1.0; use it for conversion and depeg checks |
+| Thinner liquidity | CKB/USDT, CKB/USDC | Fewer exchanges and less depth; wider confidence, two-second updates, use conservative bounds |
+
+## Market hours
+
+Crypto trades around the clock, so every feed updates 24/7. A feed can still miss individual ticks
+if too few of its exchanges are healthy at that moment; the update for that tick then leaves the
+feed out. Your contract should never assume every tick has a price.
+
+## Choosing a feed
+
+1. Prefer the pair your application actually settles in. A USDT-settled market should use a /USDT
+   feed, not a /USD feed.
+2. Prefer feeds with more exchanges and tighter confidence for anything that liquidates or settles
+   large amounts.
+3. For CKB pairs, check the confidence before acting, and consider using the EMA for slow-moving
+   decisions such as collateral ratios.
+4. Read the [feed policy](/docs/feeds/policy) for how feeds are added, changed and retired.
+
+The list of feeds also comes from the mirror: `GET /v1/feeds`.

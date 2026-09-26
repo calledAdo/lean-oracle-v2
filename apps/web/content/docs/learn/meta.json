@@ -2,5 +2,5 @@
   "title": "Learn",
   "description": "What Lean Oracle is and how it works",
   "root": true,
-  "pages": ["index", "pull-oracle", "how-it-works", "---In depth---", "price-methodology", "signed-updates", "feed-cells", "mirror", "trust-model", "glossary"]
+  "pages": ["index", "pull-oracle", "how-it-works", "---Core concepts---", "price-data", "publishers", "price-methodology", "signed-updates", "feed-cells", "mirror", "---Trust and costs---", "trust-model", "security", "costs", "---More---", "faq", "glossary"]
 }

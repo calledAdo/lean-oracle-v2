@@ -1,0 +1,59 @@
+---
+title: Publishers
+description: Who signs Lean Oracle prices, what they run, and how they are held to account.
+---
+
+A **publisher** is an operator that watches the exchanges, computes prices and signs them. Publishers
+are permissioned: each one's public key is written into a committee cell on CKB, and only those keys
+count.
+
+## What a publisher runs
+
+Each publisher runs the publisher service, a Docker image built from the open-source repository. In
+every tick it:
+
+1. **Records** live order books from every exchange its committees use, over WebSockets (REST for
+   MEXC).
+2. **Observes**: computes each feed's price with the committee's rules and signs that observation.
+3. **Shares** its observation with the other publishers over authenticated connections.
+4. **Proposes or checks**: one publisher, rotating each tick, proposes the tick's update; the others
+   check it against their own observations within a tolerance.
+5. **Signs** the update's header once a quorum agrees, and serves the finalized update to mirrors.
+
+Each publisher keeps a local database that refuses to sign two different updates for the same tick,
+even after a restart.
+
+## Why several publishers
+
+A single publisher is a single point of failure and of trust. With `n` publishers and a quorum of
+`⌊2n/3⌋ + 1`:
+
+- prices keep flowing while up to `n − quorum` publishers are down (1 of 4, 2 of 7, 2 of 9);
+- a wrong or dishonest price needs a quorum of publishers to sign it;
+- each publisher computes independently from its own exchange connections, so one bad connection
+  doesn't produce a bad price.
+
+## Who the publishers are
+
+| Committee | Publishers today | Target |
+|---|---|---|
+| majors | 1 (the Lean Oracle team) | 7 |
+| ckb | 1 (the Lean Oracle team) | 4 |
+
+<Callout type="warn" title="Testnet">
+  Testnet runs with a single publisher. Before mainnet, independent operators join, and each will be
+  listed here with its public key.
+</Callout>
+
+## Accountability
+
+- **Every signature is public and attributable.** The update names which publishers signed.
+- **Equivocation is detectable.** Two different signed updates for one tick are kept by mirrors as
+  evidence at `/v1/equivocations`.
+- **Every price is traceable** to the committee config (exchanges and settings) that produced it,
+  through the config hash in each update.
+- **Keys can be removed** by a quorum through a committee rotation.
+
+## Becoming one
+
+See [Becoming a publisher](/docs/operate/publishers) for requirements and the onboarding steps.

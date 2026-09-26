@@ -1,0 +1,64 @@
+---
+title: Understanding price data
+description: Every field of a Lean Oracle price, with a real update decoded byte by byte.
+---
+
+## The fields
+
+| Field | Type | Meaning |
+|---|---|---|
+| `price` | i64 | The aggregate price, as an integer at `expo` |
+| `conf` | u64 | Confidence: how far exchanges disagreed, at `expo` |
+| `expo` | i32 | Exponent: value = integer × 10^expo |
+| `ema_price` | i64 | One-hour exponential moving average of the price |
+| `ema_conf` | u64 | One-hour moving average of the confidence |
+| `publish_time_ms` | u64 | The tick, signed by the committee, in Unix milliseconds |
+| `prev_publish_time_ms` | u64 | The previous tick that had a price for this feed |
+| `source_time_ms` | u64 | Median time of the exchange data behind the price |
+| `num_publishers` | u8 | How many publishers' observations went into it |
+
+## A real update
+
+This is a BTC/USDT update from the testnet mirror:
+
+| Field | Raw | Value |
+|---|---|---|
+| `price` | `8393051750000` | 83,930.5175 USDT |
+| `conf` | `364500000` | ± 3.645 USDT |
+| `expo` | `-8` | |
+| `ema_price` | `8395201496232` | 83,952.01 USDT |
+| `publish_time_ms` | `1790404798000` | the tick at 06:39:58 UTC |
+| `prev_publish_time_ms` | `1790404797000` | one second earlier |
+| `source_time_ms` | `1790404797494` | exchange data from half a second before the tick |
+| `num_publishers` | `1` | |
+
+To convert: `8393051750000 × 10⁻⁸ = 83,930.5175`. Keep integers in contracts and rescale with
+`price_at_expo`; use floating point only for display.
+
+## Using confidence
+
+The confidence is the larger of the typical half-spread and the typical distance between exchanges.
+It widens when markets are thin or exchanges disagree. Use it conservatively:
+
+- value **collateral** at `price − conf` and **debt** at `price + conf`;
+- refuse to act, or widen your margins, when `conf / price` is above a limit you choose (for
+  example 1%).
+
+## Using the EMA
+
+The EMA moves slowly and resists short spikes. It suits decisions that shouldn't react to one
+tick, such as collateral ratios; the spot price suits trades and settlement.
+
+## The same update on the wire
+
+The mirror returned this update as a 402-byte blob, because it carries one feed:
+
+| Part | Bytes | Here |
+|---|---|---|
+| Header | 119 | magic `TPOU`, version 1, committee `0xb167…b5a8`, set index 0, tick `1790404798000`, tick period 1000, config hash `0x9c41…e9c5`, 10 leaves, Merkle root `0xc645…df8e` |
+| Signatures | 67 | 1 signature: publisher index 0, 65 bytes |
+| Entry count | 1 | 1 |
+| Price message | 86 | the BTC/USDT fields above |
+| Proof | 1 + 128 | 4 sibling hashes, for 10 feeds in the tick |
+
+The full layout is in [On-chain formats](/docs/reference/formats).

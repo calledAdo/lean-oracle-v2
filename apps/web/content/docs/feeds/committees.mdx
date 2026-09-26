@@ -1,0 +1,39 @@
+---
+title: Committees
+description: The two groups of publishers that sign Lean Oracle's feeds.
+---
+
+A **committee** is a group of publishers that signs a basket of feeds. It is defined by a
+`publisher_set_type` cell on CKB holding the publishers' public keys, the quorum rule and a set index.
+Every feed cell records which committee it trusts, and your contract should check it.
+
+Committees are separated by risk and cadence, not by size: the CKB pairs trade more thinly and tick
+more slowly, so they have their own committee, and a problem in one cannot affect the other.
+
+## majors
+
+BTC, ETH and SOL in USD, USDT and USDC, plus USDT/USD. One update per second.
+
+<CommitteeDetail name="majors" />
+
+## ckb
+
+CKB/USDT and CKB/USDC. One update every two seconds.
+
+<CommitteeDetail name="ckb" />
+
+## Quorum
+
+A committee of `n` publishers needs `⌊2n/3⌋ + 1` signatures on each update: 3 of 4, 5 of 7, 7 of 9.
+Up to nine publishers can join a committee. The target is seven for majors and four for ckb.
+
+<Callout type="warn" title="Testnet">
+  Both testnet committees currently have one publisher, so the quorum is 1 of 1. More independent
+  publishers join before mainnet. See [Publishers](/docs/learn/publishers).
+</Callout>
+
+## When a committee changes
+
+Keys change by rotating the committee cell, which a quorum of the current publishers must sign. The
+type hash stays the same, so your contract keeps working. The set index goes up, and only updates
+from the new set are accepted after that. See [Committee governance](/docs/operate/governance).

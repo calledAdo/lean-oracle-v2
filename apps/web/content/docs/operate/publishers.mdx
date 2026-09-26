@@ -1,30 +1,97 @@
 ---
 title: Becoming a publisher
-description: Who signs Lean Oracle prices, and how that will grow.
+description: Requirements and the onboarding path for new publishers.
 ---
 
-<Callout title="Coming later">
-  The testnet committees currently run with a single publisher. Onboarding more independent
-  publishers is the next step before mainnet.
+<Callout title="Onboarding opens before mainnet">
+  Testnet committees currently run with one publisher. This page describes how independent publishers
+  will join. If you are interested, open an issue on
+  [GitHub](https://github.com/calledAdo/lean-oracle-v2/issues).
 </Callout>
 
-## What a publisher does
+## What you commit to
 
-A publisher runs the publisher service (a Docker image), which:
+- **Uptime.** Your publisher runs around the clock. A missing publisher weakens the quorum for
+  everyone.
+- **Independence.** Your own servers, network and exchange connections. Two publishers sharing
+  infrastructure defeat the point of a committee.
+- **Key custody.** Your signing key never leaves your control. It can live in a file or in AWS KMS.
+- **Exchange terms.** You check each exchange's market-data terms for your jurisdiction.
+- **Response.** Someone watches alerts and acts on them.
 
-- keeps live connections to every exchange its committees use;
-- computes each feed's price every tick with the committee's rules;
-- exchanges observations and signatures with the other publishers;
-- signs one header per tick, never two, and serves finalized updates to mirrors.
+## What you need
 
-## What it takes
+- A Linux server (2 vCPU and 2 GB RAM are enough for one committee) with Docker.
+- Network access to every exchange in the committee's configs. Binance and Bybit refuse US IP
+  addresses; some ISPs block exchange domains.
+- A public address for the peer port (7700) and a private one for the API port (7701), which only
+  mirrors use.
 
-- A reliable server with good connectivity to the exchanges.
-- Secure key storage; the service supports a key file or AWS KMS.
-- Monitoring and on-call attention, since a missing publisher weakens the quorum.
-- Checking each exchange's market-data terms.
+## Onboarding path
 
-Committees hold up to nine publishers; the target is seven for `majors` and four for `ckb`.
+<Steps>
+<Step>
+### Check exchange access
 
-If you are interested, open an issue on
-[GitHub](https://github.com/calledAdo/lean-oracle-v2).
+```bash
+docker run --rm --entrypoint node ghcr.io/calledado/lean-oracle-publisher:edge apps/publisher/scripts/probe-venues.mjs 20
+```
+
+It connects to every market of both committees and prints `OK` or `NONE` for each. Add `--doh` if
+your ISP's DNS blocks exchange domains.
+</Step>
+<Step>
+### Generate your key
+
+```bash
+docker run --rm ghcr.io/calledado/lean-oracle-publisher:edge keygen
+```
+
+Keep the private key secret; send only the public key. For KMS, create an `ECC_SECG_P256K1` key and
+share its public key.
+</Step>
+<Step>
+### Run in shadow mode
+
+Run the publisher with the current committee configs but without being in the committee. It records
+exchanges and computes observations, so you can compare your prices with the published ones for a
+few days before joining.
+</Step>
+<Step>
+### Join the committee
+
+Your key is added by a **rotation** of the committee cell:
+
+1. the new publisher set is prepared with your key added;
+2. you sign a proof of possession, proving you hold the key;
+3. a quorum of the current publishers signs the rotation;
+4. the rotation transaction is sent, and the set index goes up.
+
+From the next tick on, your signatures count toward the quorum.
+</Step>
+<Step>
+### Approve configs
+
+From then on, you review and sign every new committee config version:
+
+```bash
+docker run --rm -v $PWD/operator:/config:ro ghcr.io/calledado/lean-oracle-publisher:edge \
+  sign-config --config /config/configs/<config.json> --key /config/publisher.key --set /config/publisher-set.hex
+```
+
+Each approval is appended to the config file's `signatures` list. A version activates at its stated
+tick once a quorum has signed.
+</Step>
+</Steps>
+
+## Running it
+
+The operator configuration (`publisher.json`), ports, key options and commands are documented in the
+[publisher service README](https://github.com/calledAdo/lean-oracle-v2/tree/main/apps/publisher).
+Important rules:
+
+- The `/data` volume holds the double-sign guard. It must persist across restarts and must never be
+  shared or copied to another machine.
+- **Never run the same key in two places.** Two instances with one key could sign conflicting updates.
+- Run with `--restart unless-stopped`: the publisher exits on purpose when the committee rotates, and
+  restarts with the new set.

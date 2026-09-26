@@ -12,6 +12,8 @@ import { CellLifecycle } from "@/components/docs/cell-lifecycle";
 import { MirrorTry } from "@/components/docs/mirror-try";
 import { MerkleTree } from "@/components/docs/merkle-tree";
 import { TxAnatomy } from "@/components/docs/tx-anatomy";
+import { FeedDetail } from "@/components/docs/feed-detail";
+import { CommitteeDetail } from "@/components/docs/committee-detail";
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -31,6 +33,8 @@ export function getMDXComponents(components?: MDXComponents) {
     MirrorTry,
     MerkleTree,
     TxAnatomy,
+    FeedDetail,
+    CommitteeDetail,
     ...components,
   } satisfies MDXComponents;
 }

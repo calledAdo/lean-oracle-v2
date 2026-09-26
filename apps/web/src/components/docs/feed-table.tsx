@@ -36,7 +36,7 @@ export function FeedTable() {
             return (
               <tr key={f.symbol} className="border-t border-border align-top">
                 <td className="px-4 py-3">
-                  <div className="font-medium">{pair(f.symbol)}</div>
+                  <a href={`/docs/feeds/${pair(f.symbol).replace("/", "-").toLowerCase()}`} className="font-medium underline-offset-4 hover:underline">{pair(f.symbol)}</a>
                   <div className="mt-0.5 max-w-[220px] text-xs text-muted-foreground">{VENUES[f.committee]?.[quote] ?? "–"}</div>
                 </td>
                 <td className="px-4 py-3 text-right font-mono tabular-nums">{live ? formatPrice(live.price) : "–"}</td>

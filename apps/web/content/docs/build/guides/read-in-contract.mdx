@@ -28,7 +28,7 @@ fn read_price(feed_type_hash: [u8; 32], feed_id: [u8; 32], committee: [u8; 32]) 
 
 - Get the three hashes from your own configuration: the feed cell's type hash (from
   [creating it](/docs/build/guides/create-feed-cell)), the feed ID from
-  [Price feeds](/docs/reference/feeds), and the committee type hash from
+  [Price feeds](/docs/feeds), and the committee type hash from
   [Networks](/docs/reference/networks).
 - If the feed cell is updated in the same transaction, read it from `Source::Output` instead.
 - `feed` also has `conf`, `ema_price`, `publish_time_ms` and `num_publishers`.

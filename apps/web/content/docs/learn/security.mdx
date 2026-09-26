@@ -1,0 +1,47 @@
+---
+title: Security
+description: How the contracts are built, verified and changed, and how to report a problem.
+---
+
+## Immutable contracts
+
+`price_feed_type` and `publisher_set_type` are deployed with `hash_type = data2` in plain code
+cells, with no Type ID and no upgrade key. Nobody can change the code your cells run. A fix is a new
+deployment with a new code hash, which you opt into.
+
+## Reproducible builds
+
+The contracts build inside a pinned container (a fixed Rust image digest, `linux/amd64`, fixed
+paths). Anyone can rebuild them and compare with the published checksums:
+
+```bash
+git clone https://github.com/calledAdo/lean-oracle-v2 && cd lean-oracle-v2
+./scripts/build-contracts.sh
+cat contracts/checksums.txt
+```
+
+The code hashes in [Networks](/docs/reference/networks) must equal these checksums. The deployment
+tool refuses to deploy a binary that doesn't match them on public networks.
+
+## Testing
+
+- Contract tests run the real RISC-V binaries in `ckb-testtool`, covering creation, updates, forward
+  only, wrong committee, bad proofs, missing signatures and rotations.
+- The TypeScript SDK and the Rust crate share test vectors, so both encode and verify identically,
+  byte for byte.
+- An end-to-end test runs publishers, the mirror and the contracts on a local CKB node.
+
+## Audits
+
+The contracts have not been audited yet. An audit is planned before mainnet.
+
+## Operations
+
+The testnet publisher and mirror are monitored, with alerts for stalls, mirror problems and
+equivocation, and backed up nightly.
+
+## Reporting a vulnerability
+
+Please report security issues privately through
+[GitHub security advisories](https://github.com/calledAdo/lean-oracle-v2/security/advisories/new)
+rather than a public issue.

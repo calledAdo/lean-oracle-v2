@@ -1,0 +1,58 @@
+---
+title: Best practices
+description: Designing a safe integration, from price selection to latency and stablecoins.
+---
+
+[Your responsibilities](/docs/build/responsibilities) lists the checks every contract must make. This
+page covers the design decisions behind them.
+
+## Integers and exponents
+
+Prices are integers with an exponent. Rescale to one exponent before comparing or combining, use
+128-bit intermediates for products, and round in the direction that favours your protocol.
+
+## Confidence
+
+Every price comes with `conf`. Use it:
+
+- value collateral at `price − conf` and debt at `price + conf`;
+- pause or widen spreads when `conf / price` exceeds a threshold;
+- expect wider confidence on [thinner-liquidity feeds](/docs/feeds#categories).
+
+## Choosing which update to apply
+
+In a pull oracle, whoever submits the transaction chooses which signed update to use. They cannot
+forge one or go backwards, but they can pick any recent one. An attacker might pick the update most
+favourable to them from the last few seconds.
+
+- Require prices to be recent: after your cell's creation, or within a small window of a recent
+  block (see [Check freshness](/docs/build/guides/freshness)).
+- For settlement, require the **exact** tick (`publish_time_ms == T`), which leaves no choice.
+
+## Latency
+
+No on-chain price can be faster than the exchanges. Traders see moves before your contract does.
+For derivatives and trading:
+
+- **Delay settlement.** Take an order now, fill it at the first tick after it was placed.
+- **Use spreads** based on confidence.
+- **Require minimum holding times** before positions can be closed.
+
+## Stablecoins
+
+- A /USDT price is in USDT. If USDT loses its peg, /USDT feeds keep pricing in USDT.
+- If you value things in USD, convert with USDT/USD, and consider pausing when USDT/USD moves more
+  than a set amount from 1.
+- Don't treat BTC/USD, BTC/USDT and BTC/USDC as interchangeable.
+
+## Availability
+
+- Plan for missing ticks and a stalled committee: your contract should fail safe (refuse to act)
+  rather than use an old price.
+- Configure more than one mirror URL in your application.
+- Keep your feed cell's lock and your keeper's key available; nobody else updates your cell.
+
+## Committee changes
+
+Pin the committee type hash, not the set index. After a rotation the type hash stays the same, so
+your contract keeps working, and updates from the old keys are refused automatically.

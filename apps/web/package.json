@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "gen": "node scripts/gen-feeds.mjs",
+    "predev": "node scripts/gen-feeds.mjs",
+    "prebuild": "node scripts/gen-feeds.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

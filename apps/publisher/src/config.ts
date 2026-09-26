@@ -37,6 +37,12 @@ export interface OperatorConfig {
    * DNS-over-HTTPS (default https://1.1.1.1/dns-query), for networks whose resolvers block them.
    */
   network?: { dns?: DnsConfig };
+  /**
+   * Shadow mode: record and price every feed like a member, but sign nothing and join no peers;
+   * compare the results with the committee's signed updates from this mirror. The key need not be
+   * in the committee.
+   */
+  shadow?: { referenceUrl: string };
   /** Development only: synthetic quotes instead of exchanges, with this publisher's skew in bps. */
   mockSource?: { skewBps: number; prices: Record<string, string> };
 }
@@ -44,6 +50,7 @@ export interface OperatorConfig {
 export interface LoadedConfig {
   operator: OperatorConfig;
   signer: KeySigner;
+  /** This key's index in the current set; -1 in shadow mode when the key is not a member. */
   index: number;
   publisherSet: PublisherSetData;
   schedule: ConfigSchedule;
@@ -52,18 +59,35 @@ export interface LoadedConfig {
 
 const readText = (path: string) => readFileSync(path, "utf8").trim();
 
+/**
+ * A committee config file. `signatures` are the approvals of the set the config was first signed by.
+ * `approvals` holds approvals by later key sets, keyed by set index: publisher indexes change when
+ * the committee rotates, so the next set approves the config again before a rotation, and publishers
+ * restarting under the new set find their approval ready.
+ */
+export interface ConfigFile {
+  config: CommitteeConfig;
+  signatures: IndexedSignature[];
+  approvals?: { setIndex: number; signatures: IndexedSignature[] }[];
+}
+
+/** The approval by key set `setIndex`: from `approvals` if present, else `signatures`. */
+export function approvalFor(file: ConfigFile, setIndex: number): IndexedSignature[] {
+  return file.approvals?.find((a) => a.setIndex === setIndex)?.signatures ?? file.signatures;
+}
+
 /** Add every config file in `dir` not yet in `schedule`; returns the versions added. */
 export function loadConfigDir(dir: string, schedule: ConfigSchedule, log: (event: string, detail?: Record<string, unknown>) => void = () => {}): number[] {
   if (!existsSync(dir)) throw new Error(`configDir ${dir} does not exist`);
   const known = new Set(schedule.all().map((v) => v.config.version));
   // Hidden files (e.g. macOS `._*` metadata) are never configs.
   const files = readdirSync(dir).filter((f) => f.endsWith(".json") && !f.startsWith("."));
-  const parsed = files.map((f) => ({ file: f, raw: JSON.parse(readText(join(dir, f))) as { config: CommitteeConfig; signatures: IndexedSignature[] } }));
+  const parsed = files.map((f) => ({ file: f, raw: JSON.parse(readText(join(dir, f))) as ConfigFile }));
   const added: number[] = [];
   for (const { file, raw } of parsed.sort((a, b) => a.raw.config.version - b.raw.config.version)) {
     if (known.has(raw.config.version)) continue;
     try {
-      const signed: SignedCommitteeConfig = { config: raw.config, signatures: toSignatureBundle(raw.signatures) };
+      const signed: SignedCommitteeConfig = { config: raw.config, signatures: toSignatureBundle(approvalFor(raw, schedule.setIndex)) };
       schedule.add(signed);
       added.push(raw.config.version);
     } catch (error) {
@@ -89,7 +113,7 @@ export async function loadConfig(path: string): Promise<LoadedConfig> {
     throw new Error("committee needs `chain` or `publisherSetFile`");
   }
   const index = publisherSet.current.pubkeys.indexOf(signer.publicKey);
-  if (index < 0) throw new Error(`this key (${signer.publicKey}) is not in the current publisher set`);
+  if (index < 0 && !operator.shadow) throw new Error(`this key (${signer.publicKey}) is not in the current publisher set`);
 
   const schedule = new ConfigSchedule(publisherSetTypeHash, publisherSet.current);
   const configDir = at(operator.committee.configDir);
@@ -98,7 +122,7 @@ export async function loadConfig(path: string): Promise<LoadedConfig> {
   }
 
   const peers = new Map<number, string>();
-  for (const peer of operator.peers) {
+  for (const peer of operator.shadow ? [] : operator.peers) {
     const peerIndex = publisherSet.current.pubkeys.indexOf(peer.pubkey.toLowerCase() as Hex);
     if (peerIndex < 0) throw new Error(`peer ${peer.pubkey} is not in the current publisher set`);
     peers.set(peerIndex, peer.url);

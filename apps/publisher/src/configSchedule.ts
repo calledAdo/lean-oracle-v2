@@ -14,6 +14,11 @@ export class ConfigSchedule {
 
   constructor(private readonly publisherSetTypeHash: Hex, private readonly set: PublisherSet) {}
 
+  /** Index of the key set configs must be approved by. */
+  get setIndex(): number {
+    return this.set.setIndex;
+  }
+
   /**
    * Add an approved version. It must be valid, approved by a quorum of the current set, for this
    * committee, and later in both version and activation than every version held.

@@ -20,7 +20,7 @@ never reused.
 The tooling refuses configs that break the feed rules: a native pair on every listed market, at least
 two exchanges required, one spare market, and each exchange at most once.
 
-## Keys: rotating the committee cell
+## Rotating keys
 
 Publishers are added, removed or replaced by rotating the committee cell:
 
@@ -30,3 +30,31 @@ Publishers are added, removed or replaced by rotating the committee cell:
 
 Committee cells can't be destroyed, only rotated. A committee can also be paused, which stops all
 updates until it is resumed.
+
+### Runbook
+
+One coordinator (usually an existing publisher) prepares the rotation; each operator signs on their
+own machine with the publisher image. All commands below are `lean-oracle-publisher <command>`, run
+as `docker run --rm -v $PWD:/w -w /w ghcr.io/calledado/lean-oracle-publisher:edge <command>`.
+
+| Step | Who | Command |
+|---|---|---|
+| 1. Read the current set | coordinator | `fetch-set --operator publisher.json > current.hex` |
+| 2. Propose the next set | coordinator | `next-set --set current.hex --add <pubkey> [--remove <pubkey>] > next.hex` |
+| 3. Review | everyone | `show-set --set next.hex` |
+| 4. Authorize | a quorum of current members | `sign-rotation --set current.hex --next next.hex --key publisher.key > auth-N.json` |
+| 5. Prove possession | every next member | `sign-pop --next next.hex --key publisher.key > pop-N.json` |
+| 6. Re-approve configs | every next member | `sign-config --config configs/vN.json --key publisher.key --set next.hex > appr-N.json` |
+| 7. Collect | coordinator | `merge-signatures auth-*.json > auth.json`, `merge-signatures pop-*.json > pop.json` |
+| 8. Record config approvals | coordinator | `add-approval --file configs/vN.json --set next.hex appr-*.json`, then send the file to every operator |
+| 9. Check | coordinator | `rotation-status --set current.hex --next next.hex --authorization auth.json --pop pop.json` |
+| 10. Send | coordinator | `npm run rotate:committee -w apps/deploy -- --network testnet --name majors --next next.hex --authorization auth.json --pop pop.json --broadcast` |
+
+After step 10, every publisher notices the new set within 15 seconds, exits and restarts under it.
+
+**Why step 6?** Publisher indexes follow the sorted list of keys, so they change when the set changes.
+A config file carries each set's approval separately (`approvals`), so the configs are valid for the
+new set the moment it goes live.
+
+`--operator publisher.json` can replace `--key` wherever a signature is made, to sign with the key
+configured for that publisher, including AWS KMS.

@@ -3,10 +3,10 @@ title: Becoming a publisher
 description: Requirements and the onboarding path for new publishers.
 ---
 
-<Callout title="Onboarding opens before mainnet">
-  Testnet committees currently run with one publisher. This page describes how independent publishers
-  will join. If you are interested, open an issue on
-  [GitHub](https://github.com/calledAdo/lean-oracle-v2/issues).
+<Callout title="Onboarding">
+  Testnet committees currently run with one publisher, and onboarding of independent operators is
+  open. To start, run shadow mode (step 3) and open an issue on
+  [GitHub](https://github.com/calledAdo/lean-oracle-v2/issues) with its report.
 </Callout>
 
 ## What you commit to
@@ -53,34 +53,64 @@ share its public key.
 <Step>
 ### Run in shadow mode
 
-Run the publisher with the current committee configs but without being in the committee. It records
-exchanges and computes observations, so you can compare your prices with the published ones for a
-few days before joining.
+Shadow mode runs the whole publisher, every exchange connection and every feed's price, but signs
+nothing and needs no committee membership. It compares your prices with the committee's signed
+updates, tick by tick.
+
+Copy the committee's current config files into your `configs/` folder, and add one line to your
+`publisher.json`:
+
+```json
+"shadow": { "referenceUrl": "https://64-227-40-35.sslip.io" }
+```
+
+```bash
+docker run -d --name shadow --restart unless-stopped \
+  -v $PWD/operator:/config:ro -v shadow-data:/data -p 127.0.0.1:7701:7701 \
+  ghcr.io/calledado/lean-oracle-publisher:edge
+curl localhost:7701/health
+```
+
+The report lists, for every feed, how many ticks were compared, how many were within the feed's
+tolerance, the largest deviation in basis points, and ticks either side missed. Share it when you
+ask to join. A healthy operator matches nearly every tick within a few basis points.
 </Step>
 <Step>
 ### Join the committee
 
-Your key is added by a **rotation** of the committee cell:
+Your key is added by **rotating** the committee cell. The on-chain script accepts the rotation only
+with signatures from a quorum of the current publishers and a proof of possession from every key in
+the new set, including yours. Each operator signs on their own machine; a coordinator collects the
+files. The full runbook is in [Committee governance](/docs/operate/governance#rotating-keys).
 
-1. the new publisher set is prepared with your key added;
-2. you sign a proof of possession, proving you hold the key;
-3. a quorum of the current publishers signs the rotation;
-4. the rotation transaction is sent, and the set index goes up.
+Your part:
 
-From the next tick on, your signatures count toward the quorum.
+```bash
+# Review the proposed set: your key should be listed.
+docker run --rm -v $PWD:/w -w /w ghcr.io/calledado/lean-oracle-publisher:edge show-set --set next.hex --key publisher.key
+
+# Prove you hold your key.
+docker run --rm -v $PWD:/w -w /w ghcr.io/calledado/lean-oracle-publisher:edge sign-pop --next next.hex --key publisher.key > pop-you.json
+
+# Approve each active committee config as a member of the new set.
+docker run --rm -v $PWD:/w -w /w ghcr.io/calledado/lean-oracle-publisher:edge \
+  sign-config --config configs/v1.json --key publisher.key --set next.hex > approval-you.json
+```
+
+Send `pop-you.json` and `approval-you.json` to the coordinator. Once the rotation is on chain, remove
+`shadow` from your config, add your peers, and restart: your signatures count from the next tick.
 </Step>
 <Step>
 ### Approve configs
 
-From then on, you review and sign every new committee config version:
+From then on you review and sign every new committee config version:
 
 ```bash
 docker run --rm -v $PWD/operator:/config:ro ghcr.io/calledado/lean-oracle-publisher:edge \
   sign-config --config /config/configs/<config.json> --key /config/publisher.key --set /config/publisher-set.hex
 ```
 
-Each approval is appended to the config file's `signatures` list. A version activates at its stated
-tick once a quorum has signed.
+A version activates at its stated tick once a quorum has signed.
 </Step>
 </Steps>
 

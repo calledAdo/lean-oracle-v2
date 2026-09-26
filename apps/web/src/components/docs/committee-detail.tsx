@@ -1,3 +1,4 @@
+import Link from "next/link";
 import data from "@/data/committees.json";
 import { CopyValue } from "./copy";
 
@@ -19,7 +20,7 @@ export function CommitteeDetail({ name }: { name: "majors" | "ckb" }) {
               "Feeds",
               <span key="f" className="flex flex-wrap gap-x-3 gap-y-1">
                 {feeds.map((f) => (
-                  <a key={f.slug} href={`/docs/feeds/${f.slug}`} className="underline underline-offset-4">{f.pair}</a>
+                  <Link key={f.slug} href={`/docs/feeds/${f.slug}`} className="underline underline-offset-4">{f.pair}</Link>
                 ))}
               </span>,
             ],

@@ -3,6 +3,9 @@ import { source } from "@/lib/source";
 // llms.txt: an index of the docs for AI coding tools (https://llmstxt.org).
 export const revalidate = false;
 
+// Absolute page URLs: the published site (NEXT_PUBLIC_SITE_URL) or site-relative in development.
+const SITE = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`;
+
 export function GET() {
   const lines = [
     "# Lean Oracle",
@@ -11,7 +14,7 @@ export function GET() {
     "",
     "## Docs",
     "",
-    ...source.getPages().map((p) => `- [${p.data.title}](${p.url})${p.data.description ? `: ${p.data.description}` : ""}`),
+    ...source.getPages().map((p) => `- [${p.data.title}](${SITE}${p.url})${p.data.description ? `: ${p.data.description}` : ""}`),
     "",
     "## Code",
     "",

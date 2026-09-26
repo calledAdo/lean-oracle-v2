@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { feedBySymbol } from "lean-oracle-sdk/presets";
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";

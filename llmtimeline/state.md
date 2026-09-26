@@ -28,7 +28,7 @@ Rust contracts and tests pass (price_feed_type, publisher_set_type, lean-oracle-
 
 ## Next
 Testnet is live (v2 contracts, one publisher, mirror at https://64-227-40-35.sslip.io, watchdog + backups on the droplet); lean-oracle-sdk 1.0.0 is on npm; the landing page (apps/web) is done with the 卜 logo. See sessions/004 and 005.
-Current work: documentation at /docs in apps/web. Docs Phase 1 and 2 are built (Fumadocs, content/docs). Next: user review, then hosting the static site. Deferred by the user: multi-publisher onboarding (step 4), mainnet prep (step 5). The pools repo is out of scope.
+Current work: documentation at /docs in apps/web. Docs are built (Fumadocs, content/docs) and published to GitHub Pages by .github/workflows/pages.yml (https://calledado.github.io/lean-oracle-v2/). Publisher onboarding tooling (shadow mode, rotation CLI) is done and drilled on devnet. Deferred by the user: multi-publisher onboarding (step 4), mainnet prep (step 5). The pools repo is out of scope.
 
 ## Notes
 - Build: `CC_riscv64imac_unknown_none_elf=riscv64-elf-gcc cargo build --release`; test: `cargo test --workspace --target aarch64-apple-darwin` (tests load the RISC-V binaries, so build first). Rust pinned to 1.92 (1.98 emits unsupported atomics).

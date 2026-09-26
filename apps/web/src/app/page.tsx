@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FEEDS } from "lean-oracle-sdk/presets";
 
 import { Button } from "@/components/ui/button";
@@ -44,14 +45,14 @@ export default function Home() {
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-8">
-          <a href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <Mark className="size-7 text-foreground" />
             <span className="font-[family-name:var(--font-heading)] text-lg font-medium tracking-tight">Lean Oracle</span>
-          </a>
+          </Link>
           <nav className="flex items-center gap-7 text-sm text-muted-foreground">
-            <a href="/docs" className="hidden hover:text-foreground md:inline">Docs</a>
+            <Link href="/docs" className="hidden hover:text-foreground md:inline">Docs</Link>
             <a href={GITHUB} className="hidden hover:text-foreground md:inline">GitHub</a>
-            <Button className="h-9 rounded-full px-4" nativeButton={false} render={<a href="/docs" />}>Get started</Button>
+            <Button className="h-9 rounded-full px-4" nativeButton={false} render={<Link href="/docs" />}>Get started</Button>
           </nav>
         </div>
       </header>
@@ -73,7 +74,7 @@ export default function Home() {
               Aggregated prices from leading exchanges, delivered to CKB applications every second and verifiable by the contracts that use them.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <Button size="lg" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<a href="/docs" />}>Get started</Button>
+              <Button size="lg" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<Link href="/docs" />}>Get started</Button>
               <Button size="lg" variant="outline" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<a href={GITHUB} />}>View on GitHub</Button>
             </div>
           </div>
@@ -115,7 +116,7 @@ export default function Home() {
               <p className="mt-3 text-muted-foreground">Live on CKB testnet, with a public mirror and an SDK on npm.</p>
             </div>
             <div className="flex gap-3">
-              <Button size="lg" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<a href="/docs" />}>Read the docs</Button>
+              <Button size="lg" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<Link href="/docs" />}>Read the docs</Button>
               <Button size="lg" variant="outline" className="h-11 rounded-full px-6 text-base" nativeButton={false} render={<a href={NPM} />}>View on npm</Button>
             </div>
           </div>
@@ -129,7 +130,7 @@ export default function Home() {
             <span className="font-[family-name:var(--font-heading)] font-medium">Lean Oracle</span>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2">
-            <a href="/docs" className="hover:text-foreground">Docs</a>
+            <Link href="/docs" className="hover:text-foreground">Docs</Link>
             <a href={GITHUB} className="hover:text-foreground">GitHub</a>
             <a href={NPM} className="hover:text-foreground">npm</a>
             <a href="https://64-227-40-35.sslip.io/health" className="hover:text-foreground">Status</a>

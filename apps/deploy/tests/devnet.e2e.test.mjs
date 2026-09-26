@@ -97,7 +97,7 @@ before(async () => {
   ], { cwd: join(repo, "apps/publisher") });
   docker("network", "create", tag);
   for (let i = 0; i < 4; i++) {
-    docker("run", "-d", "--name", `${tag}-publisher-${i}`, "--network", tag, "--network-alias", `publisher-${i}`,
+    docker("run", "-d", "--add-host", "host.docker.internal:host-gateway", "--name", `${tag}-publisher-${i}`, "--network", tag, "--network-alias", `publisher-${i}`,
       "-v", `${out}/publisher-${i}:/config:ro`, "-p", `${18700 + i * 10}:7701`, "lean-oracle-publisher:dev");
   }
   const mirrorDir = join(out, "mirror");
@@ -111,7 +111,7 @@ before(async () => {
       publishers: [0, 1, 2, 3].map((i) => `http://publisher-${i}:7701`),
     }],
   }));
-  docker("run", "-d", "--name", `${tag}-mirror`, "--network", tag, "-v", `${mirrorDir}:/config:ro`, "-p", "18800:7800", "lean-oracle-mirror:dev");
+  docker("run", "-d", "--add-host", "host.docker.internal:host-gateway", "--name", `${tag}-mirror`, "--network", tag, "-v", `${mirrorDir}:/config:ro`, "-p", "18800:7800", "lean-oracle-mirror:dev");
 });
 
 after(() => {

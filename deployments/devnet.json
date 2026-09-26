@@ -2,7 +2,7 @@
   "network": "devnet",
   "contracts": {
     "priceFeedType": {
-      "current": 1,
+      "current": 2,
       "versions": {
         "1": {
           "codeHash": "0x4df1d506fc75810fbec2871e83e90c2ec5fdb09a00638e18c3987182c126660c",
@@ -17,11 +17,25 @@
           "bytes": 120744,
           "capacity": "12080500000000",
           "deployedAt": "2026-09-23T00:00:00.000Z"
+        },
+        "2": {
+          "codeHash": "0xb9f5204f1893f16e36ee859a785899cf21a425b49fe686e1408734d3b72cd551",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xc1c4810502ee50194e3cbce6a69917df7a2af62a2e5dc901be16b7e56c5e46f9",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 122984,
+          "capacity": "12304500000000",
+          "deployedAt": "2026-09-26T18:52:04.918Z"
         }
       }
     },
     "publisherSetType": {
-      "current": 1,
+      "current": 2,
       "versions": {
         "1": {
           "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
@@ -36,6 +50,20 @@
           "bytes": 115200,
           "capacity": "11526100000000",
           "deployedAt": "2026-09-23T00:00:00.000Z"
+        },
+        "2": {
+          "codeHash": "0x3eb406f774f7962704642c2b44109f745d1b911879ec9a6fa3bc4519783a5e64",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0x6d47c27c1f79bc963abe4f5be5ca1f7b0acdc8efd32023d720584fa485830983",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 116848,
+          "capacity": "11690900000000",
+          "deployedAt": "2026-09-26T18:52:21.289Z"
         }
       }
     }
@@ -84,6 +112,26 @@
         "name": "trial",
         "typeHash": "0x5dc6640906606a71b59dc198e996389b9e3d3be86e014314663042738761d33c",
         "publishers": 1
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0xc1c4810502ee50194e3cbce6a69917df7a2af62a2e5dc901be16b7e56c5e46f9",
+      "at": "2026-09-26T18:52:04.918Z",
+      "detail": {
+        "contract": "priceFeedType",
+        "version": 2,
+        "codeHash": "0xb9f5204f1893f16e36ee859a785899cf21a425b49fe686e1408734d3b72cd551"
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0x6d47c27c1f79bc963abe4f5be5ca1f7b0acdc8efd32023d720584fa485830983",
+      "at": "2026-09-26T18:52:21.289Z",
+      "detail": {
+        "contract": "publisherSetType",
+        "version": 2,
+        "codeHash": "0x3eb406f774f7962704642c2b44109f745d1b911879ec9a6fa3bc4519783a5e64"
       }
     }
   ]

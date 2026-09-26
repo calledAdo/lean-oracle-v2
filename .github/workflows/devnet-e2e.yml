@@ -1,0 +1,72 @@
+# Devnet end-to-end on a real CKB node (plan decision D12): builds the canonical contracts, starts an
+# offckb devnet, deploys the contracts, builds the publisher and mirror images, and runs
+# apps/deploy/tests (committee of containers, feed cells, stale/tampered rejection, emergency
+# rotation, CLI-built routine rotation with a newcomer). Runs when contracts, the SDK or the apps
+# change.
+name: Devnet E2E
+
+on:
+  push:
+    branches: [main]
+    paths: ["contracts/**", "packages/sdk/**", "apps/publisher/**", "apps/mirror/**", "apps/deploy/**", "tests/**", ".github/workflows/devnet-e2e.yml"]
+  pull_request:
+    paths: ["contracts/**", "packages/sdk/**", "apps/publisher/**", "apps/mirror/**", "apps/deploy/**", "tests/**", ".github/workflows/devnet-e2e.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devnet-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # offckb's well-known genesis account #0: devnet only, never funded anywhere else.
+      DEVNET_DEPLOYER_PRIVATE_KEY: "0x6109170b275a09ad54877b82f7d9930f88cab5717d484fb4741ae9d1dd078cd6"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Contracts (reproducible build, checked against contracts/checksums.txt)
+        run: scripts/build-contracts.sh
+      - run: npm ci
+      - run: npm run build && npm run build -w lean-oracle-deploy
+      - name: Start an offckb devnet (RPC reachable from containers)
+        run: |
+          npm install -g @offckb/cli@0.4.13
+          nohup offckb node > offckb.log 2>&1 &
+          for i in $(seq 1 120); do
+            curl -sf -X POST -H 'content-type: application/json' -d '{"id":1,"jsonrpc":"2.0","method":"get_tip_block_number","params":[]}' http://127.0.0.1:8114 && break
+            sleep 2
+          done
+          # Containers reach the node through host.docker.internal (host-gateway): listen beyond loopback.
+          config=$(find "$HOME" -path '*devnet*' -name ckb.toml | head -1)
+          sed -i 's#^listen_address = "127.0.0.1:8114"#listen_address = "0.0.0.0:8114"#' "$config"
+          pkill -f "offckb node" || true; pkill -f "ckb run" || true; pkill -f "ckb miner" || true; sleep 3
+          nohup offckb node > offckb.log 2>&1 &
+          for i in $(seq 1 120); do
+            curl -sf -X POST -H 'content-type: application/json' -d '{"id":1,"jsonrpc":"2.0","method":"get_tip_block_number","params":[]}' http://127.0.0.1:8114 && break
+            sleep 2
+          done
+      - name: Deploy the contracts to the fresh devnet
+        run: |
+          # The checked-in record describes a developer's local devnet; start this chain's record clean.
+          rm -f deployments/devnet.json
+          npm run deploy:code -w lean-oracle-deploy -- --network devnet --skip-build --broadcast
+      - name: Publisher and mirror images
+        run: |
+          docker build -q -t lean-oracle-publisher:dev -f apps/publisher/Dockerfile .
+          docker build -q -t lean-oracle-mirror:dev -f apps/mirror/Dockerfile .
+      - name: End-to-end tests
+        run: LEAN_DEVNET=1 node --test apps/deploy/tests/
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -100 offckb.log || true
+          for c in $(docker ps -a --format '{{.Names}}'); do echo "== $c"; docker logs --tail 60 "$c" 2>&1 || true; done

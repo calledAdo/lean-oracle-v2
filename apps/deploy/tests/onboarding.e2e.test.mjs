@@ -56,6 +56,25 @@ async function send(signer, tx) {
   return hash;
 }
 
+/**
+ * Send a routine rotation, retrying while the chain still finds the committee cell too young: a
+ * relative `since` is measured with block median time, which trails the wall clock.
+ */
+async function sendWhenMature(signer, tx, timeoutMs = 180_000) {
+  await completeFeeAndChange(tx, signer, FEE);
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const hash = await signer.sendTransaction(tx);
+      await client.waitTransaction(hash, 0, 120_000);
+      return hash;
+    } catch (error) {
+      if (!String(error?.message ?? error).includes("Immature") || Date.now() > deadline) throw error;
+      await sleep(3000);
+    }
+  }
+}
+
 async function waitFor(what, fn, seconds = 90) {
   for (let i = 0; i < seconds; i++) {
     const value = await fn().catch(() => undefined);
@@ -86,7 +105,7 @@ before(async () => {
     "--chain-rpc", "http://host.docker.internal:8114", "--committee-type-script", JSON.stringify(typeScript),
   ], { cwd: join(repo, "apps/publisher") });
   docker("network", "create", tag);
-  docker("run", "-d", "--name", `${tag}-publisher-0`, "--network", tag, "--network-alias", "publisher-0", "--restart", "unless-stopped",
+  docker("run", "-d", "--add-host", "host.docker.internal:host-gateway", "--name", `${tag}-publisher-0`, "--network", tag, "--network-alias", "publisher-0", "--restart", "unless-stopped",
     "-v", `${out}/publisher-0:/config`, "lean-oracle-publisher:dev");
 
   // The mirror follows both publishers (the newcomer serves nothing until it joins).
@@ -98,14 +117,14 @@ before(async () => {
     committees: [{ name: "majors", publisherSetTypeHash: typeHash, chain: { rpcUrl: "http://host.docker.internal:8114", typeScript, refreshMs: 5000 }, publishers: ["http://publisher-0:7701", "http://publisher-1:7701"] }],
     rateLimit: { anonymous: { rps: 1000, burst: 1000, maxStreams: 10 } },
   }));
-  docker("run", "-d", "--name", `${tag}-mirror`, "--network", tag, "--network-alias", "mirror", "-v", `${mirrorDir}:/config:ro`, "-p", `${MIRROR_PORT}:7800`, "lean-oracle-mirror:dev");
+  docker("run", "-d", "--add-host", "host.docker.internal:host-gateway", "--name", `${tag}-mirror`, "--network", tag, "--network-alias", "mirror", "-v", `${mirrorDir}:/config:ro`, "-p", `${MIRROR_PORT}:7800`, "lean-oracle-mirror:dev");
 
   // The newcomer: its own key, the committee's current configs, and shadow mode pointed at the mirror.
   const newcomer = join(out, "publisher-1");
   cpSync(join(out, "publisher-0"), newcomer, { recursive: true });
   writeFileSync(join(newcomer, "publisher.key"), `${k1}\n`, { mode: 0o644 });
   editJson(join(newcomer, "publisher.json"), (c) => ({ ...c, peers: [], mockSource: { ...c.mockSource, skewBps: 3 }, shadow: { referenceUrl: "http://mirror:7800" } }));
-  docker("run", "-d", "--name", `${tag}-publisher-1`, "--network", tag, "--network-alias", "publisher-1", "--restart", "unless-stopped",
+  docker("run", "-d", "--add-host", "host.docker.internal:host-gateway", "--name", `${tag}-publisher-1`, "--network", tag, "--network-alias", "publisher-1", "--restart", "unless-stopped",
     "-v", `${newcomer}:/config`, "-p", `${SHADOW_PORT}:7701`, "lean-oracle-publisher:dev");
 });
 
@@ -171,7 +190,7 @@ test("a rotation built with the operator CLI adds the newcomer on chain", { skip
     authorization: pub.toSignatureBundle(JSON.parse(read("auth.json"))),
     proofOfPossession: pub.toSignatureBundle(JSON.parse(read("pop.json"))),
   });
-  state.rotationTx = await send(deployer, tx);
+  state.rotationTx = await sendWhenMature(deployer, tx);
   const rotated = await findCommitteeCell(client, state.typeScript);
   assert.equal(rotated.data.current.setIndex, 1);
   assert.equal(rotated.data.current.pubkeys.length, 2);

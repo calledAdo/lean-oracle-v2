@@ -1,9 +1,11 @@
 //! A committee as the mirror sees it: its publisher sets over time, and full verification of
 //! finalized updates against them.
 //!
-//! The mirror keeps every set it has observed. An update signed by a set that has since been
-//! rotated out is accepted only if its tick is older than the moment the mirror first saw the
-//! newer set, so a retired (possibly compromised) set cannot add history after its retirement.
+//! The mirror keeps every set it has observed. The committee cell names the previous set and the
+//! first tick of the current one (`previous.untilMs`), so an update from the previous set is accepted
+//! only for ticks before that, the same rule the feed contract applies. A set the mirror saw retire
+//! earlier keeps the bound it had. When the committee revokes the previous set, the mirror stops
+//! accepting anything new from it (history already stored stays served).
 
 import { readFileSync } from "node:fs";
 
@@ -65,15 +67,32 @@ export class Committee {
     this.observe(data);
   }
 
-  /** Record the committee cell's current set. */
+  /** Record the committee cell's current state: its current set and, if kept, the previous one. */
   observe(data: PublisherSetData): void {
     const index = data.current.setIndex;
-    if (index === this.currentIndex) return;
     if (this.currentIndex !== undefined && index < this.currentIndex) return;
-    if (this.currentIndex !== undefined) this.sets.get(this.currentIndex)!.retiredAtMs = this.now();
-    this.sets.set(index, { set: data.current });
-    this.currentIndex = index;
-    this.log("committee.set", { committee: this.name, setIndex: index, publishers: data.current.pubkeys.length });
+    const changed = index !== this.currentIndex;
+    // Every older set this mirror knows is retired: bounded by the on-chain switch tick where known,
+    // otherwise by when the mirror first saw it replaced.
+    for (const [i, known] of this.sets) {
+      if (i === index) continue;
+      const onChainBound = data.previous?.set.setIndex === i ? Number(data.previous.untilMs) : undefined;
+      const revoked = data.previous?.set.setIndex !== i;
+      const bound = revoked ? 0 : onChainBound ?? this.now();
+      if (known.retiredAtMs === undefined || bound < known.retiredAtMs) {
+        known.retiredAtMs = bound;
+        if (revoked && i === index - 1) this.log("committee.previous_revoked", { committee: this.name, setIndex: i });
+      }
+    }
+    if (data.previous && !this.sets.has(data.previous.set.setIndex)) {
+      // Learned from the chain (e.g. after a restart): history of the previous set stays verifiable.
+      this.sets.set(data.previous.set.setIndex, { set: data.previous.set, retiredAtMs: Number(data.previous.untilMs) });
+    }
+    if (changed) {
+      this.sets.set(index, { set: data.current });
+      this.currentIndex = index;
+      this.log("committee.set", { committee: this.name, setIndex: index, publishers: data.current.pubkeys.length, previous: data.previous?.set.setIndex ?? null });
+    }
   }
 
   get ready(): boolean {

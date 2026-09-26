@@ -8,9 +8,9 @@ import { resolve } from "node:path";
 import { ccc } from "@ckb-ccc/core";
 import { findCommitteeCell } from "lean-oracle-sdk/ckb";
 import type { ContractName, DeploymentRecord } from "lean-oracle-sdk/presets";
-import { decodePublisherSetData, isValidPublisherSetData, type Hex, type IndexedSignature } from "lean-oracle-sdk/protocol";
+import { decodePublisherSetData, isValidPublisherSetData, needsProofOfPossession, OP_PAUSE, OP_REVOKE_PREVIOUS, OP_ROTATE, OP_ROTATE_REVOKE, OP_UNPAUSE, type Hex, type IndexedSignature } from "lean-oracle-sdk/protocol";
 import { toSignatureBundle } from "lean-oracle-sdk/publisher";
-import { bootstrapCommittee, completeFee, occupiedCapacity, rotateCommittee } from "lean-oracle-sdk/tx";
+import { bootstrapCommittee, completeFee, DEFAULT_MIN_ROTATION_INTERVAL_S, governCommittee, occupiedCapacity } from "lean-oracle-sdk/tx";
 
 import { loadConfig, REPO_ROOT, type Context } from "./context.js";
 
@@ -104,14 +104,15 @@ export async function deployCode(ctx: Context, options: { build?: boolean } = {}
 export async function deployCommittee(ctx: Context, name: string): Promise<void> {
   const intent = ctx.config.committees[name];
   if (!intent) throw new Error(`config/${ctx.network}.json has no committee ${name}`);
-  if (ctx.record.read().committees[name]) throw new Error(`committee ${name} already exists; use rotate:committee to change its keys`);
+  if (ctx.record.read().committees[name]) throw new Error(`committee ${name} already exists; use govern:committee to change its keys`);
   const deployment = ctx.record.deployment();
   const pubkeys = [...new Set(intent.pubkeys.map((k) => k.toLowerCase() as Hex))].sort();
   const networkId = intent.networkId ?? ((await ctx.client.getHeaderByNumber(0))!.hash as Hex);
-  const data = { networkId, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys } };
-  if (!isValidPublisherSetData(data)) throw new Error(`committee ${name}: needs 1 to 9 distinct compressed public keys`);
+  const minRotationIntervalS = intent.minRotationIntervalS !== undefined ? BigInt(intent.minRotationIntervalS) : DEFAULT_MIN_ROTATION_INTERVAL_S;
+  const data = { networkId, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS, current: { setIndex: 0, pubkeys } };
+  if (!isValidPublisherSetData(data)) throw new Error(`committee ${name}: needs 1 to 9 distinct compressed public keys and a positive minRotationIntervalS`);
   const { tx, typeScript, typeHash } = await bootstrapCommittee({ signer: ctx.signer, deployment, data });
-  log("committee", { name, typeHash, publishers: pubkeys.length, quorum: Math.floor((2 * pubkeys.length) / 3) + 1, networkId });
+  log("committee", { name, typeHash, publishers: pubkeys.length, quorum: Math.floor((2 * pubkeys.length) / 3) + 1, networkId, minRotationIntervalS: minRotationIntervalS.toString() });
   const txHash = await send(ctx, tx, `committee ${name}`);
   if (!txHash) return;
   ctx.record.addCommittee(name, {
@@ -171,17 +172,40 @@ export async function retireCode(ctx: Context, contract: ContractName, version: 
   publishToSdk(ctx);
 }
 
-/** Rotate a committee to `next` (hex committee data) with quorum authorization and proofs of possession. */
-export async function rotate(ctx: Context, name: string, nextFile: string, authFile: string, popFile: string): Promise<void> {
+const OPERATIONS: Record<string, number> = {
+  rotate: OP_ROTATE,
+  "rotate-revoke": OP_ROTATE_REVOKE,
+  pause: OP_PAUSE,
+  unpause: OP_UNPAUSE,
+  "revoke-previous": OP_REVOKE_PREVIOUS,
+};
+
+/**
+ * One governance operation on a committee: `next` (hex committee data) with the current quorum's
+ * authorization, plus proofs of possession for rotations. A routine rotation is only accepted once
+ * the committee cell is `minRotationIntervalS` old.
+ */
+export async function govern(ctx: Context, name: string, opName: string, nextFile: string, authFile: string, popFile?: string): Promise<void> {
+  const operation = OPERATIONS[opName];
+  if (operation === undefined) throw new Error(`--op must be one of ${Object.keys(OPERATIONS).join(", ")}`);
   const deployment = ctx.record.deployment();
   const committee = deployment.committees[name];
   if (!committee) throw new Error(`unknown committee ${name}`);
   const next = decodePublisherSetData(readFileSync(nextFile, "utf8").trim() as Hex);
   const bundle = (f: string) => toSignatureBundle(JSON.parse(readFileSync(f, "utf8")) as IndexedSignature[]);
-  const tx = await rotateCommittee({ client: ctx.client, deployment, committee: committee.typeScript, next, authorization: bundle(authFile), proofOfPossession: bundle(popFile) });
-  const txHash = await send(ctx, tx, `rotate ${name}`);
+  if (needsProofOfPossession(operation) && !popFile) throw new Error(`${opName} requires --pop`);
+  const tx = await governCommittee({
+    client: ctx.client,
+    deployment,
+    committee: committee.typeScript,
+    operation,
+    next,
+    authorization: bundle(authFile),
+    ...(needsProofOfPossession(operation) ? { proofOfPossession: bundle(popFile!) } : {}),
+  });
+  const txHash = await send(ctx, tx, `${opName} ${name}`);
   if (!txHash) return;
-  ctx.record.addRotation(name, { setIndex: next.current.setIndex, publishers: next.current.pubkeys.length, txHash, at: now() });
+  if (needsProofOfPossession(operation)) ctx.record.addRotation(name, { setIndex: next.current.setIndex, publishers: next.current.pubkeys.length, txHash, at: now() });
   publishToSdk(ctx);
 }
 

@@ -9,20 +9,23 @@
 //!                                                  print this publisher's approval ({ publisherIndex, signature });
 //!                                                  append it to the config file's `signatures` list
 //!
-//! Committee rotation (each operator runs these on its own machine; see governance.ts):
-//!   fetch-set --operator <publisher.json>          print the committee cell's current set (0x-hex) from CKB
-//!   show-set --set <set.hex> [--key <file>]        print a set for review
-//!   next-set --set <current.hex> [--add <pubkey>]... [--remove <pubkey>]...
-//!                                                  print the next set (0x-hex); the change goes to stderr
-//!   sign-rotation --set <current.hex> --next <next.hex> (--key <file> | --operator <publisher.json>)
-//!                                                  a current member's authorization of the rotation
-//!   sign-pop --next <next.hex> (--key <file> | --operator <publisher.json>)
-//!                                                  a next-set member's proof of possession of its key
+//! Committee governance (each operator runs these on its own machine; see governance.ts). Signing
+//! commands need the committee cell's type hash: --committee <0x..>, or taken from --operator.
+//!   fetch-set --operator <publisher.json>          print the committee cell's current state (0x-hex) from CKB
+//!   show-set --set <set.hex> [--key <file>]        print a state for review
+//!   next-set --set <current.hex> --op <rotate|rotate-revoke|pause|unpause|revoke-previous>
+//!            [--add <pubkey>]... [--remove <pubkey>]... [--until-ms <tick>]
+//!                                                  print the next state (0x-hex); the change goes to stderr.
+//!                                                  A routine rotation needs --until-ms: the new set's first tick
+//!   sign-governance --set <current.hex> --next <next.hex> --op <op> [--committee <hash>] (--key <file> | --operator <publisher.json>)
+//!                                                  a current member's authorization of the operation
+//!   sign-pop --next <next.hex> [--committee <hash>] (--key <file> | --operator <publisher.json>)
+//!                                                  a next-set member's proof of possession (rotations only)
 //!   merge-signatures <file>...                     merge operators' signatures into one list
 //!   add-approval --file <configs/vN.json> --set <next.hex> <signature file>...
 //!                                                  record the next set's approval of a config (sign it with
 //!                                                  sign-config --set <next.hex>) so it stays valid after rotation
-//!   rotation-status --set <current.hex> --next <next.hex> --authorization <file> --pop <file>
+//!   governance-status --set <current.hex> --next <next.hex> --op <op> [--committee <hash>] --authorization <file> [--pop <file>]
 //!                                                  which signatures are still missing
 
 import { randomBytes } from "node:crypto";
@@ -46,7 +49,7 @@ import { SourceManager } from "./sources/manager.js";
 import { PublisherStore } from "./store.js";
 import { WsTransport } from "./wsTransport.js";
 import { FileKeySigner, createKeySigner, type KeySigner } from "./keySigner.js";
-import { describeSet, diffSets, mergeSignatures, nextSet, rotationStatus, signProofOfPossession, signRotation } from "./governance.js";
+import { describeSet, diffSets, governanceStatus, mergeSignatures, nextState, parseCommitteeHash, parseOperation, signGovernance, signProofOfPossession } from "./governance.js";
 import { ShadowRunner } from "./shadow.js";
 import type { ConfigFile, OperatorConfig } from "./config.js";
 import type { IndexedSignature } from "lean-oracle-sdk/protocol";
@@ -250,7 +253,27 @@ async function signerFrom(values: { key?: string; operator?: string }): Promise<
   throw new Error("pass --key <file> or --operator <publisher.json>");
 }
 
-type Values = { file?: string; set?: string; next?: string; key?: string; operator?: string; add?: string[]; remove?: string[]; authorization?: string; pop?: string };
+type Values = {
+  file?: string;
+  set?: string;
+  next?: string;
+  key?: string;
+  operator?: string;
+  add?: string[];
+  remove?: string[];
+  authorization?: string;
+  pop?: string;
+  op?: string;
+  committee?: string;
+  "until-ms"?: string;
+};
+
+/** The committee cell's type hash: --committee, else the operator config's committee. */
+function committeeFrom(values: Values): Hex {
+  if (values.committee) return parseCommitteeHash(values.committee);
+  if (values.operator) return parseCommitteeHash(readOperator(values.operator).operator.committee.publisherSetTypeHash);
+  return parseCommitteeHash(undefined);
+}
 
 async function governance(command: string, values: Values, positionals: string[]): Promise<void> {
   switch (command) {
@@ -272,22 +295,26 @@ async function governance(command: string, values: Values, positionals: string[]
     case "next-set": {
       if (!values.set) throw new Error("next-set requires --set");
       const current = readSet(values.set);
-      const next = nextSet(current, values.add, values.remove);
-      process.stderr.write(json(diffSets(current, next)));
+      const op = parseOperation(values.op);
+      const untilMs = values["until-ms"] !== undefined ? BigInt(values["until-ms"]) : undefined;
+      const next = nextState(current, op, { add: values.add, remove: values.remove, untilMs });
+      process.stderr.write(json(diffSets(current, next, op)));
       process.stdout.write(`${encodeSet(next)}\n`);
       return;
     }
-    case "sign-rotation": {
-      if (!values.set || !values.next) throw new Error("sign-rotation requires --set and --next");
+    case "sign-governance": {
+      if (!values.set || !values.next) throw new Error("sign-governance requires --set, --next and --op");
       const current = readSet(values.set);
       const next = readSet(values.next);
-      process.stderr.write(json({ signing: "rotation", ...diffSets(current, next) }));
-      process.stdout.write(json(await signRotation(current, next, await signerFrom(values))));
+      const op = parseOperation(values.op);
+      const committee = committeeFrom(values);
+      process.stderr.write(json({ signing: diffSets(current, next, op), committee }));
+      process.stdout.write(json(await signGovernance(current, next, op, committee, await signerFrom(values))));
       return;
     }
     case "sign-pop": {
       if (!values.next) throw new Error("sign-pop requires --next");
-      process.stdout.write(json(await signProofOfPossession(readSet(values.next), await signerFrom(values))));
+      process.stdout.write(json(await signProofOfPossession(readSet(values.next), committeeFrom(values), await signerFrom(values))));
       return;
     }
     case "merge-signatures": {
@@ -306,11 +333,11 @@ async function governance(command: string, values: Values, positionals: string[]
       process.stderr.write(`config v${file.config.version}: approval by set ${set.current.setIndex} recorded (${signatures.length} signatures)\n`);
       return;
     }
-    case "rotation-status": {
-      if (!values.set || !values.next) throw new Error("rotation-status requires --set and --next");
+    case "governance-status": {
+      if (!values.set || !values.next) throw new Error("governance-status requires --set, --next and --op");
       const auth = values.authorization ? readSignatures(values.authorization) : [];
       const pop = values.pop ? readSignatures(values.pop) : [];
-      process.stdout.write(json(rotationStatus(readSet(values.set), readSet(values.next), auth, pop)));
+      process.stdout.write(json(governanceStatus(readSet(values.set), readSet(values.next), parseOperation(values.op), committeeFrom(values), auth, pop)));
       return;
     }
   }
@@ -334,6 +361,9 @@ function main(): void {
       authorization: { type: "string" },
       pop: { type: "string" },
       file: { type: "string" },
+      op: { type: "string" },
+      committee: { type: "string" },
+      "until-ms": { type: "string" },
     },
   });
   switch (command) {
@@ -360,17 +390,17 @@ function main(): void {
     case "fetch-set":
     case "show-set":
     case "next-set":
-    case "sign-rotation":
+    case "sign-governance":
     case "sign-pop":
     case "merge-signatures":
-    case "rotation-status":
+    case "governance-status":
     case "add-approval":
       return void governance(command, values, positionals).catch((error) => {
         process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
         process.exit(1);
       });
     default:
-      process.stderr.write("usage: lean-oracle-publisher <run|keygen|pubkey|sign-config|fetch-set|show-set|next-set|sign-rotation|sign-pop|merge-signatures|add-approval|rotation-status> [options]\n");
+      process.stderr.write("usage: lean-oracle-publisher <run|keygen|pubkey|sign-config|fetch-set|show-set|next-set|sign-governance|sign-pop|merge-signatures|add-approval|governance-status> [options]\n");
       process.exit(2);
   }
 }

@@ -139,17 +139,38 @@ test("rate limits per IP and per API key", async () => {
   }
 });
 
-test("a rotated-out set can only vouch for ticks before its retirement", async () => {
+test("the previous set vouches only for ticks before the on-chain switch, until revoked", async () => {
   const { Committee } = await import("../dist/committee.js");
   const c = makeCommittee(4);
   await c.runTick(T0);
   const blob = c.nodes[0].store.finalizedAt(BigInt(T0));
-  const next = { ...c.publisherSet, current: { setIndex: 1, pubkeys: c.publisherSet.current.pubkeys } };
-  for (const [retiredAt, accepted] of [[T0 + 1, true], [T0, false]]) {
-    const committee = new Committee({ name: "majors", publisherSetTypeHash: SET_TYPE_HASH, publishers: [] }, undefined, () => retiredAt);
+  const rotatedAt = (untilMs) => ({
+    ...c.publisherSet,
+    governanceNonce: 1n,
+    current: { setIndex: 1, pubkeys: c.publisherSet.current.pubkeys },
+    previous: { set: c.publisherSet.current, untilMs: BigInt(untilMs) },
+  });
+  const fresh = () => new Committee({ name: "majors", publisherSetTypeHash: SET_TYPE_HASH, publishers: [] });
+
+  // Switch after the tick: accepted; at the tick: rejected.
+  for (const [until, accepted] of [[T0 + 1, true], [T0, false]]) {
+    const committee = fresh();
     committee.observe(c.publisherSet);
-    committee.observe(next);
+    committee.observe(rotatedAt(until));
     if (accepted) committee.verify(blob);
     else assert.throws(() => committee.verify(blob), /retired set/);
   }
+
+  // A mirror that starts after the rotation learns the previous set from the committee cell.
+  const restarted = fresh();
+  restarted.observe(rotatedAt(T0 + 1));
+  restarted.verify(blob);
+
+  // Revoking the previous set stops new ingestion from it.
+  const revoked = fresh();
+  revoked.observe(c.publisherSet);
+  revoked.observe(rotatedAt(T0 + 1));
+  const { previous: _gone, ...withoutPrevious } = rotatedAt(T0 + 1);
+  revoked.observe({ ...withoutPrevious, governanceNonce: 2n });
+  assert.throws(() => revoked.verify(blob), /retired set/);
 });

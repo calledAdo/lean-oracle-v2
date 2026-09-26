@@ -45,7 +45,7 @@ export const approve = (config, keysInOrder) => ({ config, signatures: pub.toSig
 export function makeCommittee(n, { skews = [], configs = [] } = {}) {
   const privateKeys = Array.from({ length: n }, (_, i) => `0x${(i + 1).toString(16).padStart(2, "0").repeat(32)}`);
   const ordered = privateKeys.map((key) => ({ key, pubkey: pub.publicKeyOf(key) })).sort((a, b) => (a.pubkey < b.pubkey ? -1 : 1));
-  const publisherSet = { networkId: `0x${"aa".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys: ordered.map((o) => o.pubkey) } };
+  const publisherSet = { networkId: `0x${"aa".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS: 86_400n, current: { setIndex: 0, pubkeys: ordered.map((o) => o.pubkey) } };
   const config = committeeConfig();
   const configHash = p.committeeConfigHash(config);
   const keysInOrder = ordered.map((o) => o.key);

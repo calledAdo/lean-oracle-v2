@@ -10,7 +10,7 @@
     "test": "npm run build",
     "deploy:code": "node dist/main.js deploy:code",
     "deploy:committee": "node dist/main.js deploy:committee",
-    "rotate:committee": "node dist/main.js rotate:committee",
+    "govern:committee": "node dist/main.js govern:committee",
     "show": "node dist/main.js show",
     "validate:config": "node dist/main.js validate:config",
     "sync:presets": "node dist/main.js sync:presets",

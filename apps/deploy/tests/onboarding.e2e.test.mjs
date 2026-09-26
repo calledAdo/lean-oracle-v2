@@ -2,8 +2,8 @@
 //
 //   1. A one-publisher committee (like testnet today) signs prices; a mirror serves them.
 //   2. A newcomer runs the publisher in shadow mode against the mirror and matches the committee.
-//   3. The rotation is built only from `lean-oracle-publisher` CLI output: fetch-set, next-set,
-//      sign-rotation, sign-pop, sign-config --set next, merge-signatures, add-approval, rotation-status.
+//   3. The rotation is built only from `lean-oracle-publisher` CLI output: fetch-set, next-set --op rotate,
+//      sign-governance, sign-pop, sign-config --set next, merge-signatures, add-approval, governance-status.
 //   4. The rotation is sent; the old publisher restarts under the new set, the newcomer leaves shadow
 //      mode, and updates signed 2-of-2 by the new set move a feed cell on chain.
 //
@@ -23,7 +23,7 @@ import { MirrorClient } from "lean-oracle-sdk/mirror";
 import { parseDeployment } from "lean-oracle-sdk/presets";
 import * as p from "lean-oracle-sdk/protocol";
 import * as pub from "lean-oracle-sdk/publisher";
-import { bootstrapCommittee, completeFeeAndChange, createFeedCell, rotateCommittee, updateFeedCell } from "lean-oracle-sdk/tx";
+import { bootstrapCommittee, completeFeeAndChange, createFeedCell, governCommittee, updateFeedCell } from "lean-oracle-sdk/tx";
 
 const enabled = process.env.LEAN_DEVNET === "1";
 const repo = resolve(import.meta.dirname, "../../..");
@@ -72,7 +72,7 @@ before(async () => {
   const base = parseDeployment(JSON.parse(readFileSync(join(repo, "deployments/devnet.json"), "utf8")));
   const k0 = p.bytesToHex(randomBytes(32));
   const k1 = p.bytesToHex(randomBytes(32));
-  const data = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys: [pub.publicKeyOf(k0)] } };
+  const data = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS: 1n, current: { setIndex: 0, pubkeys: [pub.publicKeyOf(k0)] } };
   const { tx, typeScript, typeHash } = await bootstrapCommittee({ signer: deployer, deployment: base, data });
   await send(deployer, tx);
   Object.assign(state, { k0, k1, typeScript, typeHash, deployment: { ...base, committees: { [tag]: { typeScript, typeHash } } } });
@@ -136,14 +136,17 @@ test("a rotation built with the operator CLI adds the newcomer on chain", { skip
 
   // Coordinator: read the live set and propose the next one.
   writeFileSync(join(work, "current.hex"), cli(work, "fetch-set", "--operator", "operator.json"));
-  writeFileSync(join(work, "next.hex"), cli(work, "next-set", "--set", "current.hex", "--add", pub.publicKeyOf(state.k1)));
+  // Routine rotation: the old set keeps verifying ticks before the new set's first tick.
+  const untilMs = String(Date.now() + 60_000);
+  writeFileSync(join(work, "next.hex"), cli(work, "next-set", "--set", "current.hex", "--op", "rotate", "--until-ms", untilMs, "--add", pub.publicKeyOf(state.k1)));
+  const committee = ["--committee", state.typeHash];
   assert.equal(JSON.parse(cli(work, "show-set", "--set", "next.hex")).quorum, 2);
 
   // Each operator on its own: authorization (current member), proofs of possession and config approvals (next set).
-  writeFileSync(join(work, "auth-0.json"), cli(work, "sign-rotation", "--set", "current.hex", "--next", "next.hex", "--key", "k0.key"));
+  writeFileSync(join(work, "auth-0.json"), cli(work, "sign-governance", "--set", "current.hex", "--next", "next.hex", "--op", "rotate", ...committee, "--key", "k0.key"));
   const configFile = readdirSync(join(state.out, "publisher-0", "configs")).find((f) => f.endsWith(".json"));
   for (const k of ["k0", "k1"]) {
-    writeFileSync(join(work, `pop-${k}.json`), cli(work, "sign-pop", "--next", "next.hex", "--key", `${k}.key`));
+    writeFileSync(join(work, `pop-${k}.json`), cli(work, "sign-pop", "--next", "next.hex", ...committee, "--key", `${k}.key`));
     writeFileSync(join(work, `appr-${k}.json`), cli(work, "sign-config", "--config", join(state.out, "publisher-0", "configs", configFile), "--key", `${k}.key`, "--set", "next.hex"));
   }
 
@@ -153,18 +156,18 @@ test("a rotation built with the operator CLI adds the newcomer on chain", { skip
   for (const dir of ["publisher-0", "publisher-1"]) {
     cli(work, "add-approval", "--file", join(state.out, dir, "configs", configFile), "--set", "next.hex", "appr-k0.json", "appr-k1.json");
   }
-  const status = JSON.parse(cli(work, "rotation-status", "--set", "current.hex", "--next", "next.hex", "--authorization", "auth.json", "--pop", "pop.json"));
+  const status = JSON.parse(cli(work, "governance-status", "--set", "current.hex", "--next", "next.hex", "--op", "rotate", ...committee, "--authorization", "auth.json", "--pop", "pop.json"));
   assert.equal(status.ready, true, JSON.stringify(status));
 
   // Peers for the two-publisher committee, ready before the restart.
   const pk = (k) => pub.publicKeyOf(k);
   editJson(join(state.out, "publisher-0", "publisher.json"), (c) => ({ ...c, peers: [{ pubkey: pk(state.k1), url: "ws://publisher-1:7700" }] }));
 
-  // The same call `rotate:committee` makes with these files.
+  // The same call `govern:committee --op rotate` makes with these files.
   const read = (f) => readFileSync(join(work, f), "utf8");
   const next = p.decodePublisherSetData(read("next.hex").trim());
-  const tx = await rotateCommittee({
-    client, deployment: state.deployment, committee: state.typeScript, next,
+  const tx = await governCommittee({
+    client, deployment: state.deployment, committee: state.typeScript, operation: p.OP_ROTATE, next,
     authorization: pub.toSignatureBundle(JSON.parse(read("auth.json"))),
     proofOfPossession: pub.toSignatureBundle(JSON.parse(read("pop.json"))),
   });

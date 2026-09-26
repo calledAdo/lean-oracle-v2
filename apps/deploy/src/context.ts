@@ -20,6 +20,8 @@ export interface CommitteeIntent {
   pubkeys: Hex[];
   /** Replay domain for rotations (default: the chain's genesis block hash). */
   networkId?: Hex;
+  /** Minimum age of the committee cell before a routine rotation, in seconds (default 24 h). */
+  minRotationIntervalS?: number;
 }
 
 export interface NetworkConfig {

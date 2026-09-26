@@ -19,7 +19,7 @@ import { MirrorClient } from "lean-oracle-sdk/mirror";
 import { parseDeployment } from "lean-oracle-sdk/presets";
 import * as p from "lean-oracle-sdk/protocol";
 import * as pub from "lean-oracle-sdk/publisher";
-import { bootstrapCommittee, burnFeedCell, completeFeeAndChange, createFeedCell, encodeFeedWitness, pullAndUpdate, rotateCommittee, updateFeedCell } from "lean-oracle-sdk/tx";
+import { bootstrapCommittee, burnFeedCell, completeFeeAndChange, createFeedCell, encodeFeedWitness, governCommittee, pullAndUpdate, updateFeedCell } from "lean-oracle-sdk/tx";
 
 const enabled = process.env.LEAN_DEVNET === "1";
 const repo = resolve(import.meta.dirname, "../../..");
@@ -80,7 +80,7 @@ before(async () => {
   if (!enabled) return;
   const base = parseDeployment(JSON.parse(readFileSync(join(repo, "deployments/devnet.json"), "utf8")));
   const keys = Array.from({ length: 4 }, () => p.bytesToHex(randomBytes(32)));
-  const data = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys: keys.map(pub.publicKeyOf).sort() } };
+  const data = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS: 1n, current: { setIndex: 0, pubkeys: keys.map(pub.publicKeyOf).sort() } };
   const { tx, typeScript, typeHash } = await bootstrapCommittee({ signer: deployer, deployment: base, data });
   await send(deployer, tx);
   state.deployment = { ...base, committees: { [tag]: { typeScript, typeHash } } };
@@ -168,15 +168,16 @@ test("a past update initializes a fresh cell", { skip: !enabled }, async () => {
   state.historicalFeed = typeScript;
 });
 
-test("after rotation, updates signed by the old set are rejected", { skip: !enabled }, async () => {
+test("after an emergency (revoking) rotation, updates signed by the old set are rejected", { skip: !enabled }, async () => {
   const nextKeys = Array.from({ length: 4 }, () => p.bytesToHex(randomBytes(32)));
   const ordered = nextKeys.map((key) => ({ key, pubkey: pub.publicKeyOf(key) })).sort((a, b) => (a.pubkey < b.pubkey ? -1 : 1));
   const current = state.committee.data;
-  const next = { ...current, governanceNonce: 1n, current: { setIndex: 1, pubkeys: ordered.map((o) => o.pubkey) } };
+  const next = { ...current, governanceNonce: 1n, current: { setIndex: 1, pubkeys: ordered.map((o) => o.pubkey) } }; // no previous: revoked
   const currentOrdered = state.committee.keys.map((key) => ({ key, pubkey: pub.publicKeyOf(key) })).sort((a, b) => (a.pubkey < b.pubkey ? -1 : 1));
-  const authorization = pub.toSignatureBundle([0, 1, 2].map((i) => pub.signRotation(current, next, p.OP_ROTATE, currentOrdered[i].key, i)));
-  const proofOfPossession = ordered.map((o, i) => pub.signProofOfPossession(next, o.key, i));
-  const tx = await rotateCommittee({ client, deployment: state.deployment, committee: state.committee.typeScript, next, authorization, proofOfPossession });
+  const h = state.committee.typeHash;
+  const authorization = pub.toSignatureBundle([0, 1, 2].map((i) => pub.signGovernance(current, next, p.OP_ROTATE_REVOKE, h, currentOrdered[i].key, i)));
+  const proofOfPossession = ordered.map((o, i) => pub.signProofOfPossession(next, h, o.key, i));
+  const tx = await governCommittee({ client, deployment: state.deployment, committee: state.committee.typeScript, operation: p.OP_ROTATE_REVOKE, next, authorization, proofOfPossession });
   await send(deployer, tx);
   const { findCommitteeCell } = await import("lean-oracle-sdk/ckb");
   const rotated = await findCommitteeCell(client, state.committee.typeScript);

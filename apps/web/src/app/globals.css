@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
 
 @theme inline {
@@ -88,4 +90,30 @@
 @keyframes ticker {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+/* Docs (Fumadocs) in the site's warm charcoal palette. */
+.dark {
+  --color-fd-background: #10131A;
+  --color-fd-foreground: #EDEAE3;
+  --color-fd-muted: #1A1E27;
+  --color-fd-muted-foreground: #9A9C9F;
+  --color-fd-popover: #1A1E27;
+  --color-fd-popover-foreground: #EDEAE3;
+  --color-fd-card: #161A22;
+  --color-fd-card-foreground: #EDEAE3;
+  --color-fd-border: #2A2F3A;
+  --color-fd-primary: #F2B544;
+  --color-fd-primary-foreground: #10131A;
+  --color-fd-secondary: #1A1E27;
+  --color-fd-secondary-foreground: #EDEAE3;
+  --color-fd-accent: #232834;
+  --color-fd-accent-foreground: #EDEAE3;
+  --color-fd-ring: #F2B544;
+  --color-fd-overlay: rgba(6, 8, 12, 0.6);
+}
+.dark #nd-sidebar {
+  --color-fd-muted: #1A1E27;
+  --color-fd-secondary: #1A1E27;
+  --color-fd-muted-foreground: #9A9C9F;
 }

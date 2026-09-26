@@ -1,0 +1,74 @@
+---
+title: How Lean Oracle works
+description: The path of one price, from the exchanges to your contract.
+---
+
+<Pipeline />
+
+## 1. Observe
+
+Each **publisher** runs a service that keeps live connections to the exchanges listed for each feed.
+It samples the order books through each **tick** (one second for major assets, two seconds for CKB).
+
+Every feed is a **native pair**. BTC/USDT is priced only from BTC/USDT markets, and BTC/USD only
+from BTC/USD markets. Publishers never convert between currencies. If you need a pair that isn't
+listed, combine feeds yourself, for example CKB/USD = CKB/USDT × USDT/USD.
+
+## 2. Agree on a price
+
+All publishers compute the price the same way:
+
+1. Keep only exchanges whose connection is alive and whose order book is healthy: not crossed, a
+   narrow spread, and real size at the top of the book.
+2. Take each exchange's mid price, sampled every 100 ms through the tick.
+3. Drop exchanges that sit too far from the median of the others.
+4. Take the **median** across exchanges as the price. Its **confidence** is the larger of the typical
+   half-spread and the typical distance between exchanges.
+5. Keep a one-hour moving average (EMA) of the price and confidence.
+
+Each feed needs at least two exchanges to agree, so no single exchange can set a price.
+
+## 3. Sign
+
+Publishers are grouped into **committees**: `majors` for BTC, ETH, SOL and USDT, and `ckb` for CKB
+pairs. A committee is defined by a cell on CKB that holds its publishers' public keys.
+
+Each tick, the committee puts every feed's price into one Merkle tree, and a **quorum** of publishers
+signs its root. The quorum is more than two thirds of the committee (`⌊2n/3⌋ + 1`). One set of
+signatures covers every feed in the tick, and a short Merkle proof picks out one feed.
+
+## 4. Serve
+
+A **mirror** collects the signed updates from the publishers, verifies them and serves them over
+HTTP and WebSocket, including full history. See the [Mirror API](/docs/reference/mirror-api).
+
+A mirror is only transport. It cannot forge or alter a price, because every update carries its
+signatures. Anyone can run one.
+
+## 5. Submit
+
+When your application needs a price, it fetches an update from a mirror and puts it in the witness of
+a transaction that updates **your feed cell**. Your feed cell is a cell you created, with a unique
+Type ID and a lock you chose.
+
+## 6. Verify
+
+The `price_feed_type` script on your feed cell accepts the new price only if:
+
+- the Merkle proof places the price under the signed root;
+- a quorum of the committee's current publishers signed that root;
+- the new price is **newer** than the one the cell holds.
+
+Your contract then reads the feed cell like any other cell dep.
+
+## Feed cells
+
+<CellLifecycle />
+
+- A new feed cell holds no price (all zeros). A non-zero publish time proves the cell has had at least
+  one verified update.
+- Each update must be newer than the last, so old prices can never be replayed against your cell.
+- The cell stores the committee it trusts. Your contract should check it, because anyone can create a
+  cell for the same feed anchored to a different committee.
+- The oracle never decides whether a price is fresh enough. That is up to your contract. See
+  [Your responsibilities](/docs/build/responsibilities).

@@ -1,0 +1,44 @@
+---
+title: Introduction
+description: What Lean Oracle is, who it is for and what you get.
+---
+
+Lean Oracle delivers exchange prices to applications on [Nervos CKB](https://www.nervos.org/). It is a
+**pull oracle**. Prices are signed off-chain every second, and your application brings one on chain
+in the same transaction that uses it.
+
+## What you get
+
+- **Prices from leading exchanges.** Each feed is priced from the exchanges that trade that exact
+  pair, such as Binance, Coinbase, Kraken and OKX. A price comes with a confidence interval and a
+  moving average.
+- **A new price every second.** Updates are signed every second for major assets and every two
+  seconds for CKB.
+- **Prices your contract can verify.** Every update carries the signatures of a committee of
+  publishers. The on-chain script checks them before your feed cell accepts a price.
+- **A cell you own.** You create your own feed cell and decide who may update it. There are no shared
+  cells to compete for.
+- **Cheap reads.** Once your feed cell holds a verified price, a contract reads it for about 38,000
+  cycles.
+
+## Who it is for
+
+- **Application developers** who need a price in a transaction: lending, derivatives, prediction
+  markets, payments and limit orders. The [TypeScript SDK](/docs/reference/sdk) fetches updates and
+  builds the transactions.
+- **Contract developers** who write CKB scripts in Rust. The [`lean-oracle-common`](/docs/reference/rust)
+  crate reads and checks a feed cell.
+
+## Where to go next
+
+<Cards>
+  <Card title="What is a pull oracle?" href="/docs/learn/pull-oracle">
+    Why prices are pulled on demand instead of pushed on a schedule.
+  </Card>
+  <Card title="How Lean Oracle works" href="/docs/learn/how-it-works">
+    The path of one price, from the exchanges to your contract.
+  </Card>
+  <Card title="Quick start" href="/docs/build/quick-start">
+    Skip ahead and read a verified price in a few lines of code.
+  </Card>
+</Cards>

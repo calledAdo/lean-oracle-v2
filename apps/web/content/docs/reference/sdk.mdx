@@ -1,0 +1,86 @@
+---
+title: TypeScript SDK
+description: lean-oracle-sdk, for reading prices and building feed cell transactions.
+---
+
+```bash
+npm install lean-oracle-sdk @ckb-ccc/core
+```
+
+`@ckb-ccc/core` is an optional peer dependency, needed only by the entry points that talk to CKB.
+
+## Entry points
+
+| Import | Contents | Needs CCC |
+|---|---|---|
+| `lean-oracle-sdk` | `feedId`, `verifyPriceUpdate`, decoders, `MirrorClient`, errors | no |
+| `lean-oracle-sdk/client` | `LeanOracleClient`, `LeanOracleTestnetClient`, `LeanOracleMainnetClient` | yes |
+| `lean-oracle-sdk/mirror` | `MirrorClient` | no |
+| `lean-oracle-sdk/tx` | Transaction builders, `pullAndUpdate`, `completeFee` | yes |
+| `lean-oracle-sdk/ckb` | Cell reads: `getFeedCell`, `findFeedCells`, `findCommitteeCell` | yes |
+| `lean-oracle-sdk/protocol` | Wire formats, hashing, Merkle proofs, signature checks | no |
+| `lean-oracle-sdk/presets` | Deployment records, feed registry, network presets | no |
+
+## LeanOracleClient
+
+The main entry point. `LeanOracleTestnetClient` is a client preconfigured for testnet.
+
+```ts
+import { LeanOracleTestnetClient } from "lean-oracle-sdk/client";
+const oracle = new LeanOracleTestnetClient();
+```
+
+| Method | Does |
+|---|---|
+| `latestPrices(feeds, committee)` | Latest verified prices, as `MirrorPrice[]` |
+| `pricesAt(timeMs, feeds, committee)` | First verified update at or after a time |
+| `createFeedCell({ signer, feed, committee, lock? })` | Transaction creating your feed cell; returns `{ tx, typeScript }` |
+| `pullAndUpdate(typeScript, { atMs?, exact? })` | Fetches, verifies and builds the update; returns `{ tx, verified, before, after }` |
+| `updateFeedCell(typeScript, update)` | The same, with an update you already have |
+| `getFeedCell(typeScript)` | The live feed cell and its decoded data |
+| `findFeedCells(feed, committee)` | Feed cells for a feed and committee |
+| `burnFeedCell(typeScript)` | Transaction burning the cell and returning its CKB |
+| `completeFee(tx, signer, { feeRate? })` | Adds inputs and change for the fee |
+| `committee(name)` / `getCommittee(name)` | Committee reference / live committee cell |
+
+`pullAndUpdate` with `{ atMs, exact: true }` moves the cell to the update published exactly at
+`atMs`, which is useful for settlement at a known time.
+
+`completeFee` adds the signer's largest plain cells first and returns
+`{ status: "ok", tx, fee }` or `{ status: "insufficient", shortfall }` instead of throwing.
+
+## MirrorClient
+
+For reading prices without CKB access, for example in a browser.
+
+```ts
+import { MirrorClient } from "lean-oracle-sdk/mirror";
+
+const mirror = new MirrorClient({ urls: ["https://64-227-40-35.sslip.io"] });
+const updates = await mirror.latest(["Crypto.BTC/USDT"]);
+const stream = mirror.stream(["Crypto.BTC/USDT"], (update) => console.log(update.prices[0].price));
+```
+
+| Method | Returns |
+|---|---|
+| `latest(feeds, options?)` | `MirrorUpdate[]` |
+| `at(timeMs, feeds, options?)` | `MirrorUpdate[]` |
+| `range(feed, fromMs, toMs, { limit? })` | `MirrorPrice[]` |
+| `feeds()` | `MirrorFeed[]` |
+| `stream(feeds, onUpdate, { onError? })` | `{ close() }` |
+
+Several URLs are tried in order. Every value is decoded from the signed blob. Pass `committees`
+(committee cell data by type hash) to verify signatures too; `LeanOracleClient` does this for you.
+
+## Price fields
+
+| Field | Meaning |
+|---|---|
+| `feedId` | Feed ID |
+| `price`, `conf` | Price and confidence, integers at `expo` |
+| `expo` | Exponent: value = price × 10^expo |
+| `emaPrice`, `emaConf` | One-hour moving averages |
+| `publishTimeMs` | When the committee signed it |
+| `prevPublishTimeMs` | The feed's previous signed time |
+| `sourceTimeMs` | Median time of the exchange data |
+| `numPublishers` | Publishers that contributed |

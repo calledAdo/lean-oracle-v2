@@ -1,0 +1,91 @@
+---
+title: Quick start
+description: Read a verified price, then put it on CKB testnet in your own feed cell.
+---
+
+<Steps>
+<Step>
+
+### Install
+
+```bash
+npm install lean-oracle-sdk @ckb-ccc/core
+```
+
+The SDK runs in Node 20+ and in browsers. `@ckb-ccc/core` is only needed for the parts that talk to
+CKB.
+
+</Step>
+<Step>
+
+### Read a verified price
+
+```ts
+import { LeanOracleTestnetClient } from "lean-oracle-sdk/client";
+
+const oracle = new LeanOracleTestnetClient();
+const [btc] = await oracle.latestPrices(["Crypto.BTC/USDT"], "majors");
+
+// Prices are integers with an exponent: value = price × 10^expo.
+console.log(Number(btc.price) * 10 ** btc.expo, new Date(Number(btc.publishTimeMs)));
+```
+
+The client fetches the latest update from the public mirror and checks the committee's signatures
+against the committee cell on chain before returning. It never trusts the mirror's JSON. Feed names
+and IDs are listed in [Price feeds](/docs/reference/feeds).
+
+</Step>
+<Step>
+
+### Create your feed cell
+
+Contracts read prices from a feed cell that you own. Create one once, with a funded testnet key (get
+testnet CKB from the [faucet](https://faucet.nervos.org)). A feed cell locks about 280 CKB, which you
+get back if you burn it.
+
+```ts
+import { ccc } from "@ckb-ccc/core";
+
+const signer = new ccc.SignerCkbPrivateKey(oracle.cccClient, process.env.PRIVATE_KEY!);
+
+async function send(tx: ccc.Transaction) {
+  const fee = await oracle.completeFee(tx, signer);
+  if (fee.status === "insufficient") throw new Error(`Needs ${fee.shortfall} more shannons`);
+  return signer.sendTransaction(fee.tx);
+}
+
+const { tx, typeScript } = await oracle.createFeedCell({ signer, feed: "Crypto.BTC/USDT", committee: "majors" });
+await send(tx);
+// Save typeScript: it identifies your feed cell from now on.
+```
+
+</Step>
+<Step>
+
+### Move it to the latest price
+
+```ts
+const update = await oracle.pullAndUpdate(typeScript);
+await send(update.tx);
+console.log(update.after.price, update.after.publishTimeMs);
+```
+
+`pullAndUpdate` fetches the latest signed update, verifies it and builds the transaction. Run it
+whenever your application needs a fresh price, usually in the same transaction that uses the price.
+
+</Step>
+<Step>
+
+### Read it in your contract
+
+Your contract takes the feed cell as a cell dep and checks it with
+[`lean-oracle-common`](/docs/reference/rust). The [tutorial](/docs/build/tutorial) walks through a
+complete contract.
+
+</Step>
+</Steps>
+
+<Callout type="warn" title="Before you ship">
+  Read [Your responsibilities](/docs/build/responsibilities). The oracle proves a price is authentic;
+  your contract must decide whether it is fresh enough.
+</Callout>

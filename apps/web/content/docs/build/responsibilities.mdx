@@ -1,0 +1,45 @@
+---
+title: Your responsibilities
+description: What the oracle guarantees, and the checks your contract must make itself.
+---
+
+Lean Oracle guarantees two things about the price in your feed cell:
+
+- **It is authentic.** A quorum of the committee's current publishers signed it.
+- **It only moves forward.** Each update is newer than the one before.
+
+Everything else is the job of your application and your contract. Go through this list before you
+ship.
+
+## In your contract
+
+- **Pin the feed cell by type hash.** Each feed cell has a unique Type ID, so its type hash
+  identifies exactly one cell. Find it in the cell deps by that hash, never by feed ID alone.
+- **Check the committee.** Compare the cell's committee type hash with the one you expect. Anyone
+  can create a cell for the same feed anchored to a committee they control. `check_feed_cell` does
+  this.
+- **Reject cells that were never updated.** A new cell has a publish time of zero. `check_feed_cell`
+  rejects it.
+- **Decide what fresh means.** CKB scripts cannot read the current time. Compare the price's publish
+  time with a time you can prove, such as the timestamp of a block loaded through a header dep. The
+  oracle never rejects a price for being old.
+- **Handle the exponent.** Prices are integers with an exponent (`-8` for majors, `-10` for CKB
+  pairs). Rescale before comparing, and guard against overflow. `price_at_expo` does both.
+- **Consider the confidence.** Every price carries `conf`, how far exchanges disagreed. A wide
+  interval means the market is thin or moving fast. Decide whether to refuse such prices.
+
+## In your application
+
+- **Plan for contention.** A cell can be consumed once per block. If many users need the price at the
+  same time, create several feed cells, or verify updates inside your own transactions.
+- **Derive pairs yourself.** Feeds are native pairs and are never converted. For CKB/USD, multiply
+  CKB/USDT by USDT/USD and decide how close their timestamps must be.
+- **Don't trust the mirror.** The SDK verifies every update before using it. If you call the Mirror
+  API directly, verify the blob, or rely on the on-chain check.
+- **Watch for committee changes.** When a committee rotates its keys, only updates signed by the new
+  set are accepted. Your feed cell keeps the last price until a new update arrives, and your
+  freshness check protects you in between.
+
+<Callout type="warn" title="Testnet">
+  The testnet committees currently have a single publisher. Treat testnet prices as test data.
+</Callout>

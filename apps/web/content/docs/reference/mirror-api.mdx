@@ -1,0 +1,77 @@
+---
+title: Mirror API
+description: Fetch signed updates over HTTP and WebSocket.
+---
+
+A mirror serves every signed update, verified and with full history. Testnet mirror:
+`https://64-227-40-35.sslip.io`.
+
+A mirror is untrusted transport. The `prices` field is a convenience; the signed data is the `blob`.
+The SDK's `MirrorClient` decodes every value from the blob and verifies it.
+
+## Try it
+
+<MirrorTry />
+
+## Endpoints
+
+`ids` takes feed IDs or symbols, comma-separated, at most 64. `committee` (a committee type hash)
+optionally restricts results to one committee. Times are milliseconds.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /v1/updates/latest?ids=` | The newest update containing each feed |
+| `GET /v1/updates/at?t=&ids=` | For each feed, the first update published at or after `t` |
+| `GET /v1/updates/range?id=&from=&to=&limit=` | One feed's updates in `[from, to]`, oldest first, at most 1000 |
+| `GET /v1/feeds` | Feeds seen, with committee and latest tick |
+| `GET /v1/equivocations?limit=` | Conflicting valid updates for the same tick, kept as evidence |
+| `WS /v1/stream?ids=` | Each new update containing any of the feeds |
+| `GET /health` | Per committee: readiness, latest tick, connected publishers |
+
+## Response
+
+```json
+{
+  "updates": [
+    {
+      "committee": "0xb167a014…",
+      "publishTimeMs": "1790384678000",
+      "blob": "0x54504f55…",
+      "prices": [
+        {
+          "feedId": "0x41b32188…",
+          "price": "8398110500000",
+          "conf": "175500000",
+          "expo": -8,
+          "emaPrice": "8398264693870",
+          "emaConf": "252773462",
+          "prevPublishTimeMs": "1790384677000",
+          "sourceTimeMs": "1790384677913",
+          "numPublishers": 1
+        }
+      ]
+    }
+  ],
+  "missing": []
+}
+```
+
+- Feeds that share a tick share one entry. Its `blob` carries only those feeds, each with its Merkle
+  proof, ready to put in a feed cell transaction.
+- 64-bit numbers are decimal strings.
+- `missing` lists requested feeds with no matching update.
+- The WebSocket sends one update object, in the same shape, per message.
+
+## Caching
+
+- An `at` answer whose ticks equal `t` exactly never changes and is served as `immutable`.
+- Other `at`, `range` and `feeds` answers may be cached for one second. `latest` is not cached.
+
+## Rate limits
+
+Anonymous clients are limited per IP: 10 requests per second, bursts of 20, and 2 open streams.
+With an API key (`x-api-key` header or `apiKey` query) the limit is per key. An exhausted limit
+returns `429` with `Retry-After`; an unknown key returns `401`. `/health` is not limited.
+
+If you need more, run your own mirror. It needs no trust, only the publisher URLs and the committee
+cell.

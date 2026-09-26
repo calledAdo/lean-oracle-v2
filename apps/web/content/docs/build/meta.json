@@ -1,0 +1,6 @@
+{
+  "title": "Build",
+  "description": "Put prices on chain and use them",
+  "root": true,
+  "pages": ["quick-start", "tutorial", "responsibilities"]
+}

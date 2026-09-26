@@ -1,0 +1,66 @@
+---
+title: Rust crate
+description: lean-oracle-common, for reading feed cells and verifying updates in CKB scripts.
+---
+
+```toml
+[dependencies]
+lean-oracle-common = { git = "https://github.com/calledAdo/lean-oracle-v2" }
+```
+
+The crate is `no_std` and works in any CKB script.
+
+## Reading a feed cell
+
+`lean_oracle_common::consumer` contains pure helpers. Your script loads the bytes; the helpers check
+them.
+
+```rust
+pub fn check_feed_cell(data: &[u8], feed_id: &[u8; 32], committee_type_hash: &[u8; 32])
+    -> Result<PriceFeedData, FeedCheckError>;
+pub fn published_after(feed: &PriceFeedData, not_before_ms: u64) -> Result<(), FeedCheckError>;
+pub fn price_at_expo(feed: &PriceFeedData, expo: i32) -> Option<i64>;
+```
+
+| Function | Checks |
+|---|---|
+| `check_feed_cell` | The data decodes, is the expected feed and committee, and holds a verified price |
+| `published_after` | The price was published strictly after a time you can prove |
+| `price_at_expo` | Rescales the price to another exponent, or `None` on overflow |
+
+`FeedCheckError` is one of `Malformed`, `WrongFeed`, `WrongCommittee`, `Uninitialized` or `Stale`.
+
+## Verifying an update in your own script
+
+To use a price without a feed cell, verify the update blob inside your script:
+
+```rust
+pub fn verify_price_update(
+    blob: &[u8],
+    feed_id: &[u8; 32],
+    publisher_set_type_hash: &[u8; 32],
+    publisher_set: &PublisherSetData,
+) -> Result<VerifiedPrice, VerifyError>;
+```
+
+Load the committee cell as a cell dep and decode it with `PublisherSetData::from_bytes`. This checks
+the Merkle proof and the quorum signatures, which costs about 8 million cycles per signature, so it
+suits scripts that need a price at one exact time.
+
+## Feed cell data
+
+125 bytes, little endian:
+
+| Offset | Field | Type |
+|---|---|---|
+| 0 | feed_id | [u8; 32] |
+| 32 | publisher_set_type_hash (committee) | [u8; 32] |
+| 64 | price | i64 |
+| 72 | conf | u64 |
+| 80 | expo | i32 |
+| 84 | publish_time_ms | u64 |
+| 92 | prev_publish_time_ms | u64 |
+| 100 | ema_price | i64 |
+| 108 | ema_conf | u64 |
+| 116 | source_time_ms | u64 |
+| 124 | num_publishers | u8 |

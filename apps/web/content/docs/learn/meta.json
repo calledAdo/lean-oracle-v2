@@ -1,0 +1,6 @@
+{
+  "title": "Learn",
+  "description": "What Lean Oracle is and how it works",
+  "root": true,
+  "pages": ["index", "pull-oracle", "how-it-works"]
+}

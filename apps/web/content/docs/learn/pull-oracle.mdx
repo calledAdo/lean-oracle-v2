@@ -1,0 +1,45 @@
+---
+title: What is a pull oracle?
+description: Why Lean Oracle signs prices off-chain and lets each transaction bring its own.
+---
+
+A blockchain cannot see the outside world. An **oracle** brings outside data, such as the price of
+BTC, on chain so that contracts can use it. There are two ways to do it.
+
+<PushPull />
+
+## Push oracles
+
+In a push oracle, the operators write each price to the chain themselves, on a schedule or when the
+price moves by more than a threshold. Contracts read the latest stored value.
+
+- The operators pay for every write, used or not, so writes are infrequent: often minutes apart.
+- Between writes, contracts read a price that may be out of date.
+- Every feed costs gas on every chain it serves, which limits how many feeds are practical.
+
+## Pull oracles
+
+In a pull oracle, prices are signed off-chain, many times a second if needed, and published by
+services anyone can query. Nothing is written to the chain until someone needs a price. The
+application fetches the latest signed update and includes it in its own transaction. The contract
+checks the signatures and only then accepts the price.
+
+- Prices are as fresh as the last signature, not the last scheduled write.
+- You pay only when you use a price, as part of a transaction you were sending anyway.
+- Adding a feed costs nothing on chain, so an oracle can offer many feeds.
+
+The trade-off is that your application does one more thing: it fetches an update and includes it in
+the transaction. The [SDK](/docs/reference/sdk) does this in one call.
+
+## Why pull suits CKB
+
+CKB stores state in **cells** that are consumed and recreated by transactions, and each cell can be
+consumed only once per block. A single shared price cell that everyone updates and reads would
+quickly become a bottleneck. With Lean Oracle, each project owns its own **feed cell** and moves it
+forward with signed updates when it needs to. Your contract reads that cell, and nobody else's
+traffic competes with yours.
+
+## Related
+
+- [How Lean Oracle works](/docs/learn/how-it-works)
+- [Your responsibilities](/docs/build/responsibilities), including how to check freshness

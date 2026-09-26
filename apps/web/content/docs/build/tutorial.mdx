@@ -1,0 +1,89 @@
+---
+title: "Tutorial: a price-triggered lock"
+description: Build a lock that releases funds once BTC/USDT crosses a price, and run it on testnet.
+---
+
+This tutorial follows the reference consumer in the repository:
+[`examples/price_trigger_lock`](https://github.com/calledAdo/lean-oracle-v2/tree/main/examples/price_trigger_lock)
+(the contract) and
+[`examples/price-trigger-ts`](https://github.com/calledAdo/lean-oracle-v2/tree/main/examples/price-trigger-ts)
+(the script that drives it).
+
+The lock holds CKB for a beneficiary until a price crosses a strike, like a limit order in miniature.
+The owner can take the funds back at any time. Once the condition holds, anyone can release the funds
+to the beneficiary.
+
+## What the lock stores
+
+The lock's `args` pin everything it trusts:
+
+| Bytes | Field |
+|---|---|
+| 0..32 | Type hash of the feed cell it reads |
+| 32..64 | Committee type hash the feed cell must be anchored to |
+| 64..96 | Feed ID |
+| 96..104 | Strike price (i64, little endian) |
+| 104..108 | Strike exponent (i32) |
+| 108 | Direction: 0 = release at or above, 1 = at or below |
+| 109..141 | Owner lock hash |
+| 141..173 | Beneficiary lock hash |
+
+## The contract
+
+The release path reads the feed cell from the cell deps and checks it with the consumer helpers:
+
+```rust
+use lean_oracle_common::consumer::{check_feed_cell, price_at_expo, published_after};
+
+// 1. The pinned feed cell: right feed, right committee, carries a verified price.
+let index = QueryIter::new(load_cell_type_hash, Source::CellDep)
+    .position(|hash| hash == Some(args.feed_type_hash))
+    .ok_or(ERROR_FEED_DEP_MISSING)?;
+let data = load_cell_data(index, Source::CellDep).map_err(|_| ERROR_FEED_DEP_MISSING)?;
+let feed = check_feed_cell(&data, &args.feed_id, &args.committee).map_err(to_error)?;
+
+// 2. Fresh enough: published after every locked cell was created. Scripts cannot read
+//    the current time, so the block header of each input (a header dep) provides one.
+let header = load_header(0, Source::GroupInput).map_err(|_| ERROR_HEADER_DEP_MISSING)?;
+published_after(&feed, header.raw().timestamp().unpack()).map_err(|_| ERROR_PRICE_STALE)?;
+
+// 3. Compare at the strike's exponent.
+let price = price_at_expo(&feed, args.expo).ok_or(ERROR_PRICE_SCALE)?;
+let met = if args.at_or_below { price <= args.strike } else { price >= args.strike };
+```
+
+The full script also checks every input and that the beneficiary receives the locked amount. Reading
+and checking the price costs about 38,000 cycles. The signatures were already verified when the feed
+cell was updated.
+
+## The transactions
+
+<Steps>
+<Step>
+**Lock the funds.** Create a cell with the lock above and the amount to release. The example uses a
+strike 1% below the current price so that it triggers straight away.
+</Step>
+<Step>
+**Update the feed cell.** Call `pullAndUpdate` once the mirror has a price published after the
+lock's block.
+</Step>
+<Step>
+**Release.** Any keeper builds a transaction that spends the locked cell. It adds the feed cell as a
+cell dep and the locked cell's block as a header dep, and pays the beneficiary.
+</Step>
+</Steps>
+
+## Run it on testnet
+
+You need Docker (the contracts build in a pinned container), Node 20+ and a funded testnet key.
+
+```bash
+git clone https://github.com/calledAdo/lean-oracle-v2 && cd lean-oracle-v2
+./scripts/build-contracts.sh
+cd examples/price-trigger-ts && npm install
+LEAN_KEY_FILE=/path/to/testnet.key node index.mjs
+```
+
+The first run deploys the lock code (about 28,700 CKB of storage) and a feed cell, and caches both.
+Each run then locks 250 CKB, updates the feed cell and releases the funds, printing every
+transaction hash.

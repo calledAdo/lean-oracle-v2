@@ -4,9 +4,10 @@ Lean Oracle testnet runs on one DigitalOcean droplet (London, 1 vCPU / 1 GB + 2 
 
 - Public mirror: **https://64-227-40-35.sslip.io** (the SDK's `leanOracleTestnetPreset.mirrorUrls`).
 - Server: `root@64.227.40.35` (SSH key login). Firewall (ufw): 22, 80, 443 only.
-- Deployment record: [`deployments/testnet.json`](../deployments/testnet.json). Contracts v2 (reproducible,
-  [`contracts/checksums.txt`](../contracts/checksums.txt)); committees `majors` and `ckb`, one publisher
-  each (quorum 1). v1 (2026-09-25, not reproducible) is retired.
+- Deployment record: [`deployments/testnet.json`](../deployments/testnet.json). Contracts v3 (the v1
+  contract freeze, reproducible, [`contracts/checksums.txt`](../contracts/checksums.txt)) since
+  2026-09-26; one committee, `majors` (12 feeds, CKB pairs included), under the always-success lock,
+  one publisher (quorum 1). v1 and v2, and the v2 `majors` and `ckb` committees, are retired.
 
 ## Layout
 
@@ -15,25 +16,25 @@ Lean Oracle testnet runs on one DigitalOcean droplet (London, 1 vCPU / 1 GB + 2 
 | Service | Image | Role |
 |---|---|---|
 | `majors` | `ghcr.io/calledado/lean-oracle-publisher:sha-…` | Publisher, majors committee (1 s ticks) |
-| `ckb` | `ghcr.io/calledado/lean-oracle-publisher:sha-…` | Publisher, CKB committee (2 s ticks) |
 | `mirror` | `ghcr.io/calledado/lean-oracle-mirror:sha-…` | Verified archive and public API |
 | `caddy` | `caddy:2-alpine` | HTTPS (Let's Encrypt) in front of the mirror |
 | `watchdog` | `ghcr.io/calledado/lean-oracle-watchdog:sha-…` | Telegram alerts (compose profile `alerts`) |
 
-Only Caddy is exposed. `majors/` and `ckb/` hold each publisher's operator config, signed committee
+Only Caddy is exposed. Data volumes are `majors-data-v3` and `mirror-data-v3` (the v2 volumes are kept,
+unused, for rollback; v3 stores refuse the v2 format). `majors/` holds the publisher's operator config, signed committee
 config (`configs/v1.json`) and the publisher key (`publisher.key`, owner uid 1000, mode 600). The
 local source of these files is `secrets/testnet-run/vps/` (git-ignored).
 
 ## Alerts and backups
 
 - **Watchdog** (`apps/watchdog`): every 30 s it checks each publisher's latest finalized tick
-  (majors 30 s, ckb 60 s), the public mirror (HTTPS, per-committee freshness) and new equivocation
+  (majors 30 s), the public mirror (HTTPS, per-committee freshness) and new equivocation
   evidence. It alerts on Telegram on the second consecutive failure, reminds hourly, reports
   recovery, and sends a summary daily at 08:00 UTC. Its secrets live in `watchdog.env` (mode 600:
   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); start it with
   `docker compose --profile alerts up -d watchdog`.
 - **Backups:** `backup.sh` ([source](../ops/testnet/backup.sh)) runs from cron at 03:30 UTC. It takes
-  SQLite online backups of the mirror and both publisher stores into `backups/<date>/`, keeps 7
+  SQLite online backups of the mirror and the publisher store into `backups/<date>/`, keeps 7
   days, and alerts on Telegram if a backup fails. Backups stay on the droplet; copy them off it
   (or enable DigitalOcean droplet backups) to survive losing the droplet.
 

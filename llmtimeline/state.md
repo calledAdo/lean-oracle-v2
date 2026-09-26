@@ -1,6 +1,6 @@
 > llmtimeline · cross-agent work record. state.md is the live snapshot — rewrite it in place. sessions/ is append-only history — never edit past files. Any agent: read this file and the newest sessions/ entries before starting.
 
-# Project State — updated 2026-09-26T15:45Z by opus (session 008)
+# Project State — updated 2026-09-26T18:30Z by opus (session 008)
 
 ## Goal
 Build the pull-based threshold price oracle for CKB specified in docs/oracle-design.md (final 2026-09-24, first version — nothing deployed before it): committees of permissioned publishers sign per-tick Merkle-batched price updates, a mirror API serves them, and projects forward-update their own Type ID-unique price_feed_type cells.
@@ -11,7 +11,7 @@ Build the pull-based threshold price oracle for CKB specified in docs/oracle-des
 - [ ] gstack setup: CLAUDE.md (commands, contract rules, routing), backlog choice (TODOS.md vs llmtimeline), versioning for /ship, branch+PR flow, /setup-deploy for the droplet.
 - [x] /office-hours: design doc docs/designs/v1-contract-freeze.md APPROVED (approach B, 7 freeze items, mainnet gate n>=4).
 - [x] /plan-eng-review on docs/designs/v1-contract-freeze.md: 20 decisions (D1-D20) + Codex outside voice; 11 implementation tasks T1-T11 listed in the doc.
-- [~] Implement contract freeze T1-T11 (T1-T4 + Rust vectors done on branch freeze/v1-contracts; next T6 SDK; checksums need Rosetta rebuild) (order: T1 formats first; then contracts T2/T3 in parallel with vectors T5 -> SDK T6 -> publisher T7 + mirror T8; then deploy T11 + CI T9; docs T10). Use /review then /ship per PR.
+- [~] Implement contract freeze T1-T11 (on branch freeze/v1-contracts: T1-T8 done, checksums recorded, all tests green; remaining T9 devnet e2e + CI, T10 docs, T11 always-success lock + testnet v3; do not merge before T11) (order: T1 formats first; then contracts T2/T3 in parallel with vectors T5 -> SDK T6 -> publisher T7 + mirror T8; then deploy T11 + CI T9; docs T10). Use /review then /ship per PR.
 - [ ] Backlog: TWAP60 windowed feeds (off-chain; apps/publisher/src/methodology.ts + config templates; design item 6).
 - [ ] Backlog: move Crypto.CKB/USDT and Crypto.CKB/USDC into the majors committee config and retire the ckb committee (config-only, after the freeze).
 - [ ] ckb-testtool suite for publisher_set_type (negative rotation cases); consider running devnet e2e in CI.

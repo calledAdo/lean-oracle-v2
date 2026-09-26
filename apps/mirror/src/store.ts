@@ -137,6 +137,26 @@ export class MirrorStore {
     }[]).map((row) => ({ committee: row.committee as Hex, tickMs: BigInt(row.tick_ms), headerHash: row.header_hash as Hex, blob: bytesToHex(row.blob), receivedMs: row.received_ms }));
   }
 
+  /**
+   * Delete updates (and their feed index rows) with a tick before `beforeMs`, in batches.
+   * Equivocation evidence is kept forever.
+   */
+  prune(beforeMs: bigint, batch = 5000): number {
+    let removed = 0;
+    for (;;) {
+      const n = Number(this.db
+        .prepare("DELETE FROM updates WHERE rowid IN (SELECT rowid FROM updates WHERE tick_ms < ? LIMIT ?)")
+        .run(beforeMs, batch).changes);
+      removed += n;
+      if (n < batch) break;
+    }
+    // Per feed and committee, so each delete walks the primary key (feed_id, committee, tick_ms).
+    const keys = this.db.prepare("SELECT DISTINCT feed_id, committee FROM feed_ticks").all() as { feed_id: string; committee: string }[];
+    const drop = this.db.prepare("DELETE FROM feed_ticks WHERE feed_id = ? AND committee = ? AND tick_ms < ?");
+    for (const k of keys) drop.run(k.feed_id, k.committee, beforeMs);
+    return removed;
+  }
+
   close(): void {
     this.db.close();
   }

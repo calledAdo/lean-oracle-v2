@@ -207,3 +207,20 @@ test("a store from an older data format is refused, not served", async () => {
   legacy.close();
   assert.throws(() => new MirrorStore(join(dir, "legacy.sqlite")), /older data format/);
 });
+
+test("retention prunes old updates and their feed index, keeps equivocation evidence", async () => {
+  const { MirrorStore } = await import("../dist/store.js");
+  const c = makeCommittee(4);
+  for (let i = 0; i < 4; i++) await c.runTick(T0 + i * 1000);
+  const store = new MirrorStore(":memory:");
+  for (const hex of c.nodes[0].store.finalizedAfter(0n, 100)) store.insert(p.decodePriceUpdate(hex), p.hexToBytes(hex), Date.now());
+  const btc = p.feedId(BTC_USD);
+  assert.equal(store.range(btc, 0n, BigInt(T0 + 10_000), 100).length, 4);
+
+  assert.equal(store.prune(BigInt(T0 + 2000), 1), 2);
+  assert.deepEqual(store.range(btc, 0n, BigInt(T0 + 10_000), 100).map((u) => u.tickMs), [BigInt(T0 + 2000), BigInt(T0 + 3000)]);
+  assert.equal(store.atOrAfter(btc, BigInt(T0))?.tickMs, BigInt(T0 + 2000));
+  assert.equal(store.latest(btc)?.tickMs, BigInt(T0 + 3000));
+  assert.equal(store.feeds().find((f) => f.feedId === btc)?.latestTickMs, BigInt(T0 + 3000));
+  store.close();
+});

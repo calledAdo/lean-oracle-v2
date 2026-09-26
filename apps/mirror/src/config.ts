@@ -30,12 +30,20 @@ export interface MirrorConfig {
   dataPath: string;
   committees: CommitteeSourceConfig[];
   rateLimit?: RateLimitConfig;
+  /**
+   * How long updates are kept, in days (default 7; 0 keeps everything). Older ticks are pruned, so
+   * `/v1/updates/at` and `/range` answer only inside the window. Equivocation evidence is kept.
+   */
+  retentionDays?: number;
 }
 
 export function loadMirrorConfig(path: string): MirrorConfig {
   const config = JSON.parse(readFileSync(path, "utf8")) as MirrorConfig;
   if (!config.http || !config.dataPath || !Array.isArray(config.committees) || config.committees.length === 0) {
     throw new Error("mirror config needs http, dataPath and at least one committee");
+  }
+  if (config.retentionDays !== undefined && !(Number.isFinite(config.retentionDays) && config.retentionDays >= 0)) {
+    throw new Error("retentionDays must be a number of days, 0 or more (0 keeps everything)");
   }
   for (const c of config.committees) {
     if (!c.chain && !c.publisherSetFile) throw new Error(`committee ${c.name}: needs chain or publisherSetFile`);

@@ -138,6 +138,25 @@ export class PublisherStore {
       .all(this.committee, afterMs, limit) as { blob: Uint8Array }[]).map((row) => bytesToHex(row.blob));
   }
 
+  /**
+   * Delete finalized updates and double-sign records with a tick before `beforeMs`, in batches.
+   * Safe for the double-sign guard: the node never signs a tick older than `maxSigningLagMs`, so
+   * `beforeMs` must stay well behind it. Key sets and per-feed state (EMA) are kept.
+   */
+  prune(beforeMs: bigint, batch = 5000): number {
+    let removed = 0;
+    for (;;) {
+      const n = Number(this.db
+        .prepare("DELETE FROM finalized WHERE rowid IN (SELECT rowid FROM finalized WHERE committee = ? AND tick_ms < ? LIMIT ?)")
+        .run(this.committee, beforeMs, batch).changes);
+      removed += n;
+      if (n < batch) break;
+    }
+    // signed_ticks keys tick_ms as TEXT, so compare numerically.
+    this.db.prepare("DELETE FROM signed_ticks WHERE committee = ? AND CAST(tick_ms AS INTEGER) < ?").run(this.committee, beforeMs);
+    return removed;
+  }
+
   close(): void {
     this.db.close();
   }

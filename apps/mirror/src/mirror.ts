@@ -8,6 +8,7 @@ import { startApi } from "./api.js";
 import { Ingestor, PublisherSource, type Log } from "./ingest.js";
 import { DEFAULT_RATE_LIMIT, RateLimiter } from "./rateLimit.js";
 import { MirrorStore } from "./store.js";
+import { DEFAULT_RETENTION_DAYS, startPruning } from "./retention.js";
 
 export interface RunningMirror {
   server: Server;
@@ -20,6 +21,7 @@ export interface RunningMirror {
 
 export async function startMirror(config: MirrorConfig, log: Log = () => {}): Promise<RunningMirror> {
   const store = new MirrorStore(config.dataPath);
+  const stopPruning = startPruning(store, (config.retentionDays ?? DEFAULT_RETENTION_DAYS) * 86_400_000, log);
   const ingestor = new Ingestor(store, log);
   const committees = config.committees.map((c) => new Committee(c, log));
   await Promise.all(committees.map((c) => c.start()));
@@ -38,6 +40,7 @@ export async function startMirror(config: MirrorConfig, log: Log = () => {}): Pr
     async stop() {
       for (const source of sources) source.stop();
       for (const committee of committees) committee.stop();
+      stopPruning();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       store.close();
     },

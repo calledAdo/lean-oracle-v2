@@ -71,5 +71,5 @@ const oracle = new LeanOracleTestnetClient({
 </Step>
 </Steps>
 
-Storage grows by about 0.4 GB per day for a 10-feed committee at one-second ticks. API keys with their own limits go under
+The mirror keeps 7 days of history by default (`retentionDays`, about 0.8 GB per day for 12 feeds at one-second ticks, so about 5.5 GB); set `0` to keep everything. API keys with their own limits go under
 `rateLimit.keys`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Nightly backup of the mirror history and each publisher's store (which holds the double-sign
-# guard), using SQLite's online backup so services keep running. Keeps 7 days in
+# guard), using SQLite's online backup so services keep running. Keeps 3 days in
 # /opt/lean-oracle/backups. On failure, alerts through the watchdog's Telegram settings.
 # Installed by cron: 30 3 * * * /opt/lean-oracle/backup.sh
 set -uo pipefail
@@ -23,5 +23,5 @@ for item in "mirror-data-v3:mirror.db" "majors-data-v3:publisher.sqlite"; do
     sh -c "apk add -q sqlite >/dev/null && sqlite3 /data/$file \".backup /out/$name.sqlite\" && gzip -f /out/$name.sqlite" \
     || fail "$name ($volume/$file)"
 done
-find backups -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} +
+find backups -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} +
 echo "backup ok: $dest $(du -sh "$dest" | cut -f1)"

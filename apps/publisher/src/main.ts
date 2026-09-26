@@ -42,6 +42,7 @@ import { loadConfig, loadConfigDir } from "./config.js";
 import { parseDecimal } from "./fixed.js";
 import { MarketData } from "./marketData.js";
 import { PublisherNode } from "./node.js";
+import { DEFAULT_RETENTION_HOURS, startPruning } from "./retention.js";
 import { TickScheduler } from "./scheduler.js";
 import { emitMockQuotes, mockMarketsFor } from "./sources/mock.js";
 import { exchangeLookup } from "./net/resolver.js";
@@ -98,6 +99,8 @@ async function run(configPath: string): Promise<void> {
     connectedPeers: transport.connectedPeers(),
   }));
   log("publisher.started", { index: c.index, publicKey: c.signer.publicKey, publishers: c.publisherSet.current.pubkeys.length, configVersions: c.schedule.all().map((v) => v.config.version) });
+
+  stops.push(startPruning(store, (c.operator.retentionHours ?? DEFAULT_RETENTION_HOURS) * 3_600_000, log));
 
   // Re-read the committee cell: on rotation or pause, exit so the container restarts with the new set.
   const chain = c.operator.committee.chain;

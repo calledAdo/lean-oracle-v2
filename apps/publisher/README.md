@@ -93,6 +93,11 @@ Add to `publisher.json` (the key need not be in the committee; `peers` are ignor
 "shadow": { "referenceUrl": "https://64-227-40-35.sslip.io" }
 ```
 
+Shadow mode also verifies every update it fetches against the committee's current key set and keeps
+it in `/data`, and every publisher remembers each key set it has run under. **Keep the same `/data`
+volume when you switch from shadow to member**: you join with the committee's finalized history, which
+the proposer order and the EMA depend on, and sync the rest from your peers.
+
 `GET /health` on the API port reports, per feed: ticks compared, how many were within the feed's
 tolerance, the maximum deviation in basis points, and ticks either side missed. A summary is logged
 every minute, and every tick outside tolerance is logged as `shadow.outside_tolerance`.

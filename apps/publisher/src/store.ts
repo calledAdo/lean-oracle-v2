@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { bytesToHex, hexToBytes, type Hex, type PriceUpdate } from "lean-oracle-sdk/protocol";
+import { bytesToHex, hexToBytes, type Hex, type PriceUpdate, type PublisherSet } from "lean-oracle-sdk/protocol";
 
 import type { FeedState } from "./aggregate.js";
 
@@ -21,6 +21,7 @@ export class PublisherStore {
       PRAGMA synchronous = FULL;
       CREATE TABLE IF NOT EXISTS signed_ticks (committee TEXT, tick_ms TEXT, header_hash TEXT, PRIMARY KEY (committee, tick_ms));
       CREATE TABLE IF NOT EXISTS finalized (committee TEXT, tick_ms INTEGER, blob BLOB NOT NULL, PRIMARY KEY (committee, tick_ms));
+      CREATE TABLE IF NOT EXISTS key_sets (committee TEXT, set_index INTEGER, pubkeys TEXT NOT NULL, PRIMARY KEY (committee, set_index));
       CREATE TABLE IF NOT EXISTS feed_state (committee TEXT, feed_id TEXT, tick_ms TEXT, ema_price TEXT, ema_conf TEXT, PRIMARY KEY (committee, feed_id));
     `);
   }
@@ -37,6 +38,20 @@ export class PublisherStore {
       .prepare("SELECT header_hash FROM signed_ticks WHERE committee = ? AND tick_ms = ?")
       .get(this.committee, tickMs.toString()) as { header_hash: string } | undefined;
     return row?.header_hash === headerHash;
+  }
+
+  /**
+   * Remember a key set this publisher has run under (or shadowed). After a rotation, history signed
+   * by an earlier set can still be verified and synced, so a newcomer and the old members agree on
+   * the anchor and the EMA state.
+   */
+  saveKeySet(set: PublisherSet): void {
+    this.db.prepare("INSERT OR IGNORE INTO key_sets (committee, set_index, pubkeys) VALUES (?, ?, ?)").run(this.committee, set.setIndex, JSON.stringify(set.pubkeys));
+  }
+
+  keySet(setIndex: number): PublisherSet | undefined {
+    const row = this.db.prepare("SELECT pubkeys FROM key_sets WHERE committee = ? AND set_index = ?").get(this.committee, setIndex) as { pubkeys: string } | undefined;
+    return row && { setIndex, pubkeys: JSON.parse(row.pubkeys) as Hex[] };
   }
 
   hasFinalized(tickMs: bigint): boolean {

@@ -5,11 +5,12 @@
 
 import { createServer, type Server } from "node:http";
 
-import type { Hex, ObservationEntry } from "lean-oracle-sdk/protocol";
+import { decodePriceUpdate, hexToBytes, priceUpdateSigningHash, verifyThreshold, type Hex, type ObservationEntry, type PublisherSet } from "lean-oracle-sdk/protocol";
 
 import type { ConfigSchedule } from "./configSchedule.js";
 import type { MarketData } from "./marketData.js";
 import { observeFeeds } from "./methodology.js";
+import type { PublisherStore } from "./store.js";
 
 type Log = (event: string, detail?: Record<string, unknown>) => void;
 
@@ -42,6 +43,13 @@ export interface ShadowOptions {
   referenceUrl: string;
   api: { host: string; port: number };
   log: Log;
+  /**
+   * With a store and the committee's current key set, every signed update fetched from the mirror is
+   * verified and kept as history, so the operator joins with the same finalized history (anchor and
+   * EMA state) as the committee.
+   */
+  store?: PublisherStore;
+  set?: PublisherSet;
   fetch?: typeof fetch;
   /** How long after a tick to fetch the committee's update (default 3 s). */
   compareDelayMs?: number;
@@ -143,12 +151,31 @@ export class ShadowRunner {
     const url = `${this.o.referenceUrl.replace(/\/$/, "")}/v1/updates/at?t=${tickMs}&ids=${feedIds.join(",")}&committee=${this.o.publisherSetTypeHash}`;
     const res = await this.fetchFn(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) throw new Error(`mirror returned ${res.status}`);
-    const body = (await res.json()) as { updates: { publishTimeMs: string; prices: { feedId: string; price: string }[] }[] };
+    const body = (await res.json()) as { updates: { publishTimeMs: string; blob?: Hex; prices: { feedId: string; price: string }[] }[] };
     const out = new Map<Hex, bigint>();
     for (const u of body.updates) {
       if (BigInt(u.publishTimeMs) !== tickMs) continue;
       for (const p of u.prices) out.set(p.feedId.toLowerCase() as Hex, BigInt(p.price));
+      if (u.blob) this.keep(u.blob);
     }
     return out;
+  }
+
+  /** Verify a signed update against the current key set and store it as history. */
+  private keep(blobHex: Hex): void {
+    const { store, set } = this.o;
+    if (!store || !set) return;
+    try {
+      const blob = hexToBytes(blobHex);
+      const update = decodePriceUpdate(blob);
+      if (update.header.publisherSetTypeHash.toLowerCase() !== this.o.publisherSetTypeHash.toLowerCase() || update.header.setIndex !== set.setIndex) return;
+      if (!verifyThreshold(update.signatures, priceUpdateSigningHash(update.header), set)) {
+        this.o.log("shadow.bad_signatures", { tickMs: update.header.publishTimeMs.toString() });
+        return;
+      }
+      store.saveFinalized(update, blob);
+    } catch (error) {
+      this.o.log("shadow.keep_failed", { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 }

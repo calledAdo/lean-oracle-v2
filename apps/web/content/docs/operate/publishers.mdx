@@ -98,7 +98,12 @@ docker run --rm -v $PWD:/w -w /w ghcr.io/calledado/lean-oracle-publisher:edge \
 ```
 
 Send `pop-you.json` and `approval-you.json` to the coordinator. Once the rotation is on chain, remove
-`shadow` from your config, add your peers, and restart: your signatures count from the next tick.
+`shadow` from your config, add your peers, and restart the same container: your signatures count from
+the next tick.
+
+Keep the same data volume (`shadow-data` above). Shadow mode stores the committee's verified history
+there, and a new member needs it to agree with the others on who proposes each tick and on the moving
+averages.
 </Step>
 <Step>
 ### Approve configs

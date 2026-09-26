@@ -374,8 +374,13 @@ export class PublisherNode {
   private acceptFinalized(blob: Uint8Array): void {
     const update = decodePriceUpdate(blob);
     const { header } = update;
-    if (header.publisherSetTypeHash !== this.o.publisherSetTypeHash || header.setIndex !== this.o.publisherSet.current.setIndex) return;
-    if (!verifyThreshold(update.signatures, priceUpdateSigningHash(header), this.o.publisherSet.current)) {
+    if (header.publisherSetTypeHash !== this.o.publisherSetTypeHash) return;
+    // History from an earlier key set is accepted only if this publisher knows that set (it ran
+    // under it or shadowed it); a newer set than ours is never accepted.
+    const current = this.o.publisherSet.current;
+    const set = header.setIndex === current.setIndex ? current : header.setIndex < current.setIndex ? this.o.store.keySet(header.setIndex) : undefined;
+    if (!set) return;
+    if (!verifyThreshold(update.signatures, priceUpdateSigningHash(header), set)) {
       this.log("finalized.bad_signatures", { tickMs: header.publishTimeMs.toString() });
       return;
     }

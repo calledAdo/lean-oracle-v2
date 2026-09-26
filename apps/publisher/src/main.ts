@@ -59,6 +59,7 @@ async function run(configPath: string): Promise<void> {
   const c = await loadConfig(configPath);
   if (c.operator.shadow) return runShadow(c);
   const store = new PublisherStore(join(c.operator.dataDir, "publisher.sqlite"), c.operator.committee.publisherSetTypeHash);
+  store.saveKeySet(c.publisherSet.current);
   const marketData = new MarketData();
   const transport = new WsTransport({
     selfIndex: c.index,
@@ -162,7 +163,12 @@ async function runShadow(c: Loaded): Promise<void> {
   const marketData = new MarketData();
   const stops: (() => void)[] = [];
   startSources(c, marketData, stops);
+  const store = new PublisherStore(join(c.operator.dataDir, "publisher.sqlite"), c.operator.committee.publisherSetTypeHash);
+  store.saveKeySet(c.publisherSet.current);
+  stops.push(() => store.close());
   const shadow = new ShadowRunner({
+    store,
+    set: c.publisherSet.current,
     schedule: c.schedule,
     marketData,
     publisherSetTypeHash: c.operator.committee.publisherSetTypeHash,
@@ -204,7 +210,9 @@ async function probeMarkets(config: CommitteeConfig, seconds: number, doh: boole
 
 async function signConfig(values: { config?: string; key?: string; set?: string; probe?: string; doh?: boolean }): Promise<void> {
   if (!values.config || !values.key || !values.set) throw new Error("sign-config requires --config, --key and --set");
-  const config = JSON.parse(readFileSync(values.config, "utf8")) as CommitteeConfig;
+  // A bare config, or a config file from configDir (`{ config, signatures, approvals? }`).
+  const raw = JSON.parse(readFileSync(values.config, "utf8")) as CommitteeConfig | ConfigFile;
+  const config = "config" in raw && "signatures" in raw ? raw.config : (raw as CommitteeConfig);
   const problems = validateCommitteeConfig(config);
   if (problems.length > 0) throw new Error(`refusing to sign an invalid config:\n  ${problems.join("\n  ")}`);
   if (values.probe) {

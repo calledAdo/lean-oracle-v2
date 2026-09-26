@@ -44,6 +44,11 @@ docker run -d --name publisher \
 
 Paths are relative to the config file.
 
+- **`retentionHours`.** How long finalized updates stay in the local store (default 24; `0` keeps
+  everything; otherwise at least 1). Mirrors are the archive; this bounds the publisher's disk at
+  about 0.4 GB per day of window for 12 feeds at 1 s ticks. Peers and mirrors offline for longer
+  catch up only from what is left.
+
 - **`key`.** Where the publisher key lives. `{ "type": "file", "path" }` points to a file holding a
   0x-hex private key. `{ "type": "aws-kms", "keyId", "region" }` uses an AWS KMS key with key spec
   `ECC_SECG_P256K1`, and the key never leaves KMS. The container needs AWS credentials in the usual

@@ -23,6 +23,9 @@ Config:
   (`http://host:7701`). List several; any one of them is enough.
 - `rateLimit`: `anonymous` and per-key `{ rps, burst, maxStreams }`.
 - `http.trustProxy`: only behind a proxy that sets `X-Forwarded-For`.
+- `retentionDays`: how much history to keep (default 7, about 0.8 GB per day for 12 feeds at 1 s
+  ticks; `0` keeps everything). Older ticks are pruned every 10 minutes, so `at` and `range` answer
+  only inside the window. Equivocation evidence is always kept.
 
 Publishers' APIs should be reachable only by mirrors. Put a CDN or reverse proxy in front of the
 mirror for TLS and caching; exact-tick `at` answers are marked immutable.

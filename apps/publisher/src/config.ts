@@ -38,6 +38,12 @@ export interface OperatorConfig {
    */
   network?: { dns?: DnsConfig };
   /**
+   * How long finalized updates stay in the local store, in hours (default 24; 0 keeps everything).
+   * The publisher is not the archive: mirrors are. A peer or mirror offline for longer can only
+   * catch up from what is left.
+   */
+  retentionHours?: number;
+  /**
    * Shadow mode: record and price every feed like a member, but sign nothing and join no peers;
    * compare the results with the committee's signed updates from this mirror. The key need not be
    * in the committee.
@@ -102,6 +108,11 @@ export async function loadConfig(path: string): Promise<LoadedConfig> {
   const at = (p: string) => resolve(base, p);
   const operator = JSON.parse(readText(path)) as OperatorConfig;
   const publisherSetTypeHash = operator.committee.publisherSetTypeHash.toLowerCase() as Hex;
+  const retention = operator.retentionHours;
+  if (retention !== undefined && !(retention === 0 || (Number.isFinite(retention) && retention >= 1))) {
+    // At least an hour: far behind maxSigningLagMs, so pruning never weakens the double-sign guard.
+    throw new Error("retentionHours must be 0 (keep everything) or at least 1");
+  }
 
   const signer = await createKeySigner(operator.key.type === "file" ? { ...operator.key, path: at(operator.key.path) } : operator.key);
   let publisherSet: PublisherSetData;

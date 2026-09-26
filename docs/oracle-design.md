@@ -446,9 +446,12 @@ bursts of 20, 2 streams per anonymous client. Unknown keys get 401, exhausted bu
 `Retry-After`. `/health` is not limited. Heavy users should run their own mirror: it needs no
 trust, only publisher URLs and the committee cell.
 
-Full history is retained. Measured on testnet: about 0.4 GB/day for a 10-feed committee at 1 s
-ticks in each publisher store, and about 0.8 GB/day in the mirror (measured with two committees before the CKB pairs joined majors); plan disk or
-retention accordingly. Not yet built: serving
+History is bounded. Measured on testnet v3 (12 feeds, 1 s ticks): about 0.4 GB/day in a publisher
+store and about 0.8 GB/day in the mirror. The mirror keeps `retentionDays` (default 7) and the
+publisher `retentionHours` (default 24); older ticks are pruned every 10 minutes and SQLite reuses
+the freed pages, so disk use levels off at about 5.5 GB and 0.4 GB. Equivocation evidence, key
+sets and EMA state are never pruned. An archive mirror sets `retentionDays: 0`. A mirror offline
+longer than the publishers' window cannot backfill the gap. Not yet built: serving
 approved committee configs (`/v1/configs`).
 
 ## 9. Consumer guidance

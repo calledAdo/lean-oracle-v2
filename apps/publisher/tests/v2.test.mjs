@@ -217,3 +217,36 @@ test("measurement: each feed uses only its own pair's markets, with no conversio
   assert.equal(bySymbol["Crypto.BTC/USDT"], 6_030_000_500_000n, "USDT markets priced in USDT, untouched by USD books");
   assert.equal(bySymbol["Crypto.USDT/USD"], undefined, "no USDT/USD markets → no feed, and nothing else depends on it");
 });
+
+test("retention prunes old finalized ticks and double-sign records, keeps key sets and EMA state", async () => {
+  const { makeCommittee, T0 } = await import("./helpers.mjs");
+  const c = makeCommittee(4);
+  for (let i = 0; i < 5; i++) await c.runTick(T0 + i * 1000);
+  const store = c.nodes[0].store;
+  const feed = p.feedId("Crypto.BTC/USD");
+  const ema = store.feedState(feed);
+  store.saveKeySet(c.publisherSet.current);
+  assert.equal(store.finalizedAfter(0n, 100).length, 5);
+
+  assert.equal(store.prune(BigInt(T0 + 3000), 1), 3); // batch of 1: the loop drains every batch
+  assert.deepEqual(store.finalizedAfter(0n, 100).map((b) => p.decodePriceUpdate(b).header.publishTimeMs), [BigInt(T0 + 3000), BigInt(T0 + 4000)]);
+  assert.equal(store.finalizedAt(BigInt(T0)), undefined);
+  assert.equal(store.latestFinalizedTick(), BigInt(T0 + 4000));
+  assert.deepEqual(store.feedState(feed), ema);
+  assert.deepEqual(store.keySet(c.publisherSet.current.setIndex), c.publisherSet.current);
+  // A kept tick still refuses a second header; nothing is left to refuse for a pruned one.
+  const other = `0x${"ab".repeat(32)}`;
+  assert.equal(store.reserveSignature(BigInt(T0 + 4000), other), false);
+  assert.equal(store.prune(BigInt(T0 + 3000)), 0);
+});
+
+test("pruning runs at start with the window, and a window of 0 keeps everything", async () => {
+  const { startPruning } = await import("../dist/retention.js");
+  let pruned;
+  const stop = startPruning({ prune: (before) => ((pruned = before), 0) }, 3_600_000, () => {});
+  stop();
+  assert.ok(Math.abs(Number(pruned) - (Date.now() - 3_600_000)) < 5_000);
+  let called = false;
+  startPruning({ prune: () => ((called = true), 0) }, 0, () => {})();
+  assert.equal(called, false);
+});

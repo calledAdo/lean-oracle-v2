@@ -57,7 +57,7 @@ async function main(): Promise<void> {
       return retireCommittee(ctx(), need(v.name, "name"), v.reason!);
     case "retire:code": {
       const contract = need(v.contract, "contract");
-      if (contract !== "priceFeedType" && contract !== "publisherSetType") throw new Error("--contract must be priceFeedType or publisherSetType");
+      if (contract !== "priceFeedType" && contract !== "publisherSetType" && contract !== "alwaysSuccessLock") throw new Error("--contract must be priceFeedType, publisherSetType or alwaysSuccessLock");
       return retireCode(ctx(), contract, Number(need(v.version, "version")), v["allow-current"]);
     }
     case "show":

@@ -11,7 +11,7 @@ Build the pull-based threshold price oracle for CKB specified in docs/oracle-des
 - [ ] gstack setup: CLAUDE.md (commands, contract rules, routing), backlog choice (TODOS.md vs llmtimeline), versioning for /ship, branch+PR flow, /setup-deploy for the droplet.
 - [x] /office-hours: design doc docs/designs/v1-contract-freeze.md APPROVED (approach B, 7 freeze items, mainnet gate n>=4).
 - [x] /plan-eng-review on docs/designs/v1-contract-freeze.md: 20 decisions (D1-D20) + Codex outside voice; 11 implementation tasks T1-T11 listed in the doc.
-- [ ] Implement contract freeze T1-T11 (order: T1 formats first; then contracts T2/T3 in parallel with vectors T5 -> SDK T6 -> publisher T7 + mirror T8; then deploy T11 + CI T9; docs T10). Use /review then /ship per PR.
+- [~] Implement contract freeze T1-T11 (T1 done on branch freeze/v1-contracts; T2 next) (order: T1 formats first; then contracts T2/T3 in parallel with vectors T5 -> SDK T6 -> publisher T7 + mirror T8; then deploy T11 + CI T9; docs T10). Use /review then /ship per PR.
 - [ ] Backlog: TWAP60 windowed feeds (off-chain; apps/publisher/src/methodology.ts + config templates; design item 6).
 - [ ] Backlog: move Crypto.CKB/USDT and Crypto.CKB/USDC into the majors committee config and retire the ckb committee (config-only, after the freeze).
 - [ ] ckb-testtool suite for publisher_set_type (negative rotation cases); consider running devnet e2e in CI.

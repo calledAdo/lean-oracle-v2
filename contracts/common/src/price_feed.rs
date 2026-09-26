@@ -1,10 +1,12 @@
 //! Price feed cell data (docs/oracle-design.md section 7.1), mirroring lean-oracle's oracle cell.
+//! `set_index` records which key set signed the stored price, so consumers can stop trusting it
+//! when the committee pauses or revokes that set.
 
 use alloc::vec::Vec;
 
 use crate::price_update::VerifiedPrice;
 
-pub const PRICE_FEED_LEN: usize = 125;
+pub const PRICE_FEED_LEN: usize = 129;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PriceFeedData {
@@ -20,6 +22,8 @@ pub struct PriceFeedData {
     pub ema_conf: u64,
     pub source_time_ms: u64,
     pub num_publishers: u8,
+    /// Committee key set that signed the stored price.
+    pub set_index: u32,
 }
 
 impl PriceFeedData {
@@ -40,6 +44,7 @@ impl PriceFeedData {
             ema_conf: u64::from_le_bytes(array(data, &mut offset)?),
             source_time_ms: u64::from_le_bytes(array(data, &mut offset)?),
             num_publishers: data[offset],
+            set_index: u32::from_le_bytes(data[offset + 1..].try_into().ok()?),
         })
     }
 
@@ -56,6 +61,7 @@ impl PriceFeedData {
         out.extend_from_slice(&self.ema_conf.to_le_bytes());
         out.extend_from_slice(&self.source_time_ms.to_le_bytes());
         out.push(self.num_publishers);
+        out.extend_from_slice(&self.set_index.to_le_bytes());
         out
     }
 
@@ -70,6 +76,7 @@ impl PriceFeedData {
             && self.ema_conf == 0
             && self.source_time_ms == 0
             && self.num_publishers == 0
+            && self.set_index == 0
     }
 
     pub fn static_fields_unchanged(&self, other: &Self) -> bool {
@@ -89,6 +96,7 @@ impl PriceFeedData {
             && self.ema_conf == m.ema_conf
             && self.source_time_ms == m.source_time_ms
             && self.num_publishers == m.num_publishers
+            && self.set_index == verified.header.set_index
     }
 }
 

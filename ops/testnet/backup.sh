@@ -17,8 +17,8 @@ fail() {
   fi
   exit 1
 }
-for item in "mirror-data:mirror.db" "majors-data:publisher.sqlite" "ckb-data:publisher.sqlite"; do
-  volume="lean-oracle_${item%%:*}"; file="${item#*:}"; name="${item%%-data:*}"
+for item in "mirror-data-v3:mirror.db" "majors-data-v3:publisher.sqlite"; do
+  volume="lean-oracle_${item%%:*}"; file="${item#*:}"; name="${item%%-data*}"
   docker run --rm -v "$volume":/data -v "$PWD/$dest":/out alpine:3 \
     sh -c "apk add -q sqlite >/dev/null && sqlite3 /data/$file \".backup /out/$name.sqlite\" && gzip -f /out/$name.sqlite" \
     || fail "$name ($volume/$file)"

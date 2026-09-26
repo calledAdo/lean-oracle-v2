@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.0.0 (2026-09-26)
+
+Contract freeze formats (docs/designs/v1-contract-freeze.md). Not compatible with 1.x; matches the
+testnet v3 deployment (one `majors` committee, CKB pairs included).
+
+- Committee cell v2: `minRotationIntervalS`, optional `previous` set with `untilMs`; operations
+  `OP_ROTATE`, `OP_ROTATE_REVOKE`, `OP_PAUSE`, `OP_UNPAUSE`, `OP_REVOKE_PREVIOUS`; `transitionError`.
+- Governance digests take the committee type hash: `publisherSetUpdateHash(current, next, op, committee)`,
+  `publisherSetPopHash(next, committee)`, `signGovernance` (replaces `signRotation`),
+  `signProofOfPossession(next, committee, key, index)`.
+- `governCommittee` replaces `rotateCommittee` and covers every operation (a routine rotation sets
+  the relative `since` for the committee's interval).
+- `updateFeedCells`: several feed cells of one committee in one transaction, one signature check
+  (at most `MAX_FEEDS_PER_TX` = 32, of one contract version).
+- A routine rotation carries the chain tip's header; `previous.untilMs` at most `MAX_UNTIL_AHEAD_MS`
+  (1 hour) past it. The `LOCKED` governance flag is gone; `PAUSED` is the only flag.
+- Feed cell data is 129 bytes (`setIndex`); `isFeedPriceTrusted(feed, committee)` and
+  `LeanOracleClient.isFeedPriceTrusted`.
+- `verifyPriceUpdate` accepts the previous set for ticks before its switch.
+- Magics `LOPU` (update) and `LOOB` (observation).
+- Deployments carry an optional `alwaysSuccessLock`; `bootstrapCommittee` puts new committee cells
+  under it by default (no key can block governance) and `governCommittee` adds its cell dep.
+  `findCodeRef` looks up a contract version by code hash without throwing.
+
 ## 1.0.0
 
 First stable release of the Lean Oracle SDK; same code as 1.0.0-beta.1.

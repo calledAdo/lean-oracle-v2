@@ -37,6 +37,8 @@ const oracle = new LeanOracleTestnetClient();
 | `createFeedCell({ signer, feed, committee, lock? })` | Transaction creating your feed cell; returns `{ tx, typeScript }` |
 | `pullAndUpdate(typeScript, { atMs?, exact? })` | Fetches, verifies and builds the update; returns `{ tx, verified, before, after }` |
 | `updateFeedCell(typeScript, update)` | The same, with an update you already have |
+| `updateFeedCells([typeScripts], update)` | Several feed cells of one committee in one transaction; the committee's signatures are checked once, so N feeds cost about as much as one |
+| `isFeedPriceTrusted(feedCell)` | Whether a stored price may be used now: authenticated, committee not paused, key set still trusted |
 | `getFeedCell(typeScript)` | The live feed cell and its decoded data |
 | `findFeedCells(feed, committee)` | Feed cells for a feed and committee |
 | `burnFeedCell(typeScript)` | Transaction burning the cell and returning its CKB |

@@ -9,6 +9,24 @@ import { bytesToHex, hexToBytes, type Hex, type PriceUpdate, type PublisherSet }
 
 import type { FeedState } from "./aggregate.js";
 
+/**
+ * Stores hold raw update blobs, so a store written by an older format (v1 `TPOU` blobs, v1 committee
+ * data) must not be reused: it would serve or decode blobs this code no longer reads. SQLite's
+ * `user_version` records the format; a store without it that already holds data is from before it.
+ */
+export const STORE_FORMAT = 2;
+
+export function checkStoreFormat(db: DatabaseSync, table: string, path: string): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version === STORE_FORMAT) return;
+  const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number | bigint };
+  if (version === 0 && Number(n) === 0) {
+    db.exec(`PRAGMA user_version = ${STORE_FORMAT}`);
+    return;
+  }
+  throw new Error(`${path} was written by an older data format (store format ${version}, expected ${STORE_FORMAT}); start with a fresh data volume`);
+}
+
 export class PublisherStore {
   private readonly db: DatabaseSync;
   private readonly finalizedListeners = new Set<(tickMs: bigint, blob: Uint8Array) => void>();
@@ -24,6 +42,7 @@ export class PublisherStore {
       CREATE TABLE IF NOT EXISTS key_sets (committee TEXT, set_index INTEGER, pubkeys TEXT NOT NULL, PRIMARY KEY (committee, set_index));
       CREATE TABLE IF NOT EXISTS feed_state (committee TEXT, feed_id TEXT, tick_ms TEXT, ema_price TEXT, ema_conf TEXT, PRIMARY KEY (committee, feed_id));
     `);
+    checkStoreFormat(this.db, "finalized", path);
   }
 
   /**

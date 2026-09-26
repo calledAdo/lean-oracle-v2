@@ -22,7 +22,7 @@ secp256k1, with strictly increasing publisher indexes.
 
 | Offset | Field | Type |
 |---|---|---|
-| 0 | magic `"TPOU"` | [u8; 4] |
+| 0 | magic `"LOPU"` | [u8; 4] |
 | 4 | version = 1 | u8 |
 | 5 | publisher_set_type_hash (committee) | [u8; 32] |
 | 37 | set_index | u32 |
@@ -62,11 +62,14 @@ secp256k1, with strictly increasing publisher indexes.
 
 ## Witness
 
-In `WitnessArgs.input_type` of the feed cell's input: `update_len u32 | update blob`.
+In `WitnessArgs.input_type` of the **leader** feed input: `update_len u32 | update blob`. When several
+feed cells of one committee move in one transaction, the first of them (the lowest input index that
+is an updating feed cell of that committee) carries the only blob, with every moved feed's entry, and
+the other feed inputs leave `input_type` empty. The committee's signatures are then checked once.
 
 ## Feed cell
 
-Type script `price_feed_type`, `args = feed_id || type_id` (64 bytes). Data (125 bytes):
+Type script `price_feed_type`, `args = feed_id || type_id` (64 bytes). Data (129 bytes):
 
 | Offset | Field | Type |
 |---|---|---|
@@ -81,3 +84,4 @@ Type script `price_feed_type`, `args = feed_id || type_id` (64 bytes). Data (125
 | 108 | ema_conf | u64 |
 | 116 | source_time_ms | u64 |
 | 124 | num_publishers | u8 |
+| 125 | set_index (key set that signed the stored price) | u32 |

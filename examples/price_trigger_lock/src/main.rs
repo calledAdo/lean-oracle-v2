@@ -18,6 +18,8 @@
 //! - **cancel:** an input is locked by the owner's lock (which checks the owner's signature); or
 //! - **trigger (anyone, e.g. a keeper):**
 //!   1. the pinned feed cell is a cell dep, for the right feed and committee, with an authenticated price;
+//!      the committee cell is also a cell dep, and it is not paused and still trusts the key set that
+//!      signed the price;
 //!   2. that price was published **after** every cell of this lock was created: each input's block
 //!      header is a header dep, so the script can prove when the cell appeared (scripts cannot
 //!      read the current time);
@@ -46,6 +48,7 @@ use ckb_std::{
     high_level::{load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type_hash, load_header, load_script, QueryIter},
 };
 use lean_oracle_common::consumer::{check_feed_cell, price_at_expo, published_after, FeedCheckError};
+use lean_oracle_common::publisher_set::PublisherSetData;
 
 pub const ERROR_ARGS: i8 = 100;
 pub const ERROR_FEED_DEP_MISSING: i8 = 101;
@@ -58,6 +61,9 @@ pub const ERROR_HEADER_DEP_MISSING: i8 = 107;
 pub const ERROR_CONDITION_NOT_MET: i8 = 108;
 pub const ERROR_BENEFICIARY_UNDERPAID: i8 = 109;
 pub const ERROR_PRICE_SCALE: i8 = 110;
+pub const ERROR_COMMITTEE_DEP: i8 = 111;
+pub const ERROR_COMMITTEE_PAUSED: i8 = 112;
+pub const ERROR_UNTRUSTED_SET: i8 = 113;
 
 const ARGS_LEN: usize = 173;
 
@@ -110,12 +116,21 @@ fn trigger(args: &Args) -> Result<(), i8> {
         .position(|hash| hash == Some(args.feed_type_hash))
         .ok_or(ERROR_FEED_DEP_MISSING)?;
     let data = load_cell_data(index, Source::CellDep).map_err(|_| ERROR_FEED_DEP_MISSING)?;
-    let feed = check_feed_cell(&data, &args.feed_id, &args.committee).map_err(|error| match error {
+    let committee_index = QueryIter::new(load_cell_type_hash, Source::CellDep)
+        .position(|hash| hash == Some(args.committee))
+        .ok_or(ERROR_COMMITTEE_DEP)?;
+    let committee = load_cell_data(committee_index, Source::CellDep)
+        .ok()
+        .and_then(|bytes| PublisherSetData::from_bytes(&bytes))
+        .ok_or(ERROR_COMMITTEE_DEP)?;
+    let feed = check_feed_cell(&data, &args.feed_id, &args.committee, &committee).map_err(|error| match error {
         FeedCheckError::Malformed => ERROR_FEED_MALFORMED,
         FeedCheckError::WrongFeed => ERROR_FEED_WRONG_FEED,
         FeedCheckError::WrongCommittee => ERROR_FEED_WRONG_COMMITTEE,
         FeedCheckError::Uninitialized => ERROR_FEED_UNINITIALIZED,
         FeedCheckError::Stale => ERROR_PRICE_STALE,
+        FeedCheckError::Paused => ERROR_COMMITTEE_PAUSED,
+        FeedCheckError::UntrustedSet => ERROR_UNTRUSTED_SET,
     })?;
 
     // 2. Published after every locked cell was created (block timestamps via header deps).

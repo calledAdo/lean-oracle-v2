@@ -2,7 +2,7 @@
   "network": "testnet",
   "contracts": {
     "priceFeedType": {
-      "current": 2,
+      "current": 3,
       "versions": {
         "1": {
           "codeHash": "0x4df1d506fc75810fbec2871e83e90c2ec5fdb09a00638e18c3987182c126660c",
@@ -34,12 +34,30 @@
           },
           "bytes": 120952,
           "capacity": "12101300000000",
-          "deployedAt": "2026-09-25T12:51:12.117Z"
+          "deployedAt": "2026-09-25T12:51:12.117Z",
+          "retired": {
+            "txHash": "0x15c2a7693b0cc0d2f36a27e46cea8be5f9e58bb9f45be2a58ab0807b41e34604",
+            "at": "2026-09-26T22:04:10.217Z"
+          }
+        },
+        "3": {
+          "codeHash": "0x0cfb92a77c98b8b90731aedcb19ee0b12827e73c133e2448d50b3fa9ba8da876",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xad68ecd84054383a35d01ff37877e83b95c1c1abe82dbef2b2d4414690480e31",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 122984,
+          "capacity": "12304500000000",
+          "deployedAt": "2026-09-26T22:24:50.548Z"
         }
       }
     },
     "publisherSetType": {
-      "current": 2,
+      "current": 3,
       "versions": {
         "1": {
           "codeHash": "0x6c8308a4a5ed10d592b253db0d147b759c0653e553e72db6cf7fb79c4036539e",
@@ -71,7 +89,44 @@
           },
           "bytes": 115416,
           "capacity": "11547700000000",
-          "deployedAt": "2026-09-25T12:51:30.298Z"
+          "deployedAt": "2026-09-25T12:51:30.298Z",
+          "retired": {
+            "txHash": "0xc7446926f87439f0e9140d18bd3e999d7eb8a6e8825bb0dade519afaabc10389",
+            "at": "2026-09-26T22:23:50.385Z"
+          }
+        },
+        "3": {
+          "codeHash": "0xe8eaf1bd1db480480b1a48513d8a4508901ca392dd7acd1fc9c8e2bb62f3d636",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xdc6c74159313e35e0b8ffcc19fe1d48e1626e365792381c0a5c77ce0eb346008",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 117728,
+          "capacity": "11778900000000",
+          "deployedAt": "2026-09-26T22:25:23.212Z"
+        }
+      }
+    },
+    "alwaysSuccessLock": {
+      "current": 1,
+      "versions": {
+        "1": {
+          "codeHash": "0x2a2e548b4f39e77ef743b0492b98f0d9714fbad789a4b484248311b5402b5ca9",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xe86a9e2e122468f310c7bb945b7b25cc26b2da120d457d74f92e937f611331eb",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 1104,
+          "capacity": "116500000000",
+          "deployedAt": "2026-09-26T22:25:38.404Z"
         }
       }
     }
@@ -79,27 +134,14 @@
   "committees": {
     "majors": {
       "typeScript": {
-        "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
+        "codeHash": "0xe8eaf1bd1db480480b1a48513d8a4508901ca392dd7acd1fc9c8e2bb62f3d636",
         "hashType": "data2",
-        "args": "0x091472b13e21ffcabbb8bca728fcb5251850f76531526d19652c596724e5a38a"
+        "args": "0x7cc49464b9d1178a375e02253ed5a5e118afe2e3aa4130bec212660f295c6005"
       },
-      "typeHash": "0xb167a0145feff4716498c087dcc4d225bbab63661d8f8b2e854bcaba8b3bb5a8",
-      "codeVersion": 2,
-      "createdTx": "0xbe47f4efa296dfb5b6e9510d992d92992a0a83d58097b1c23c49f9422656156a",
-      "createdAt": "2026-09-25T12:51:51.167Z",
-      "publishers": 1,
-      "rotations": []
-    },
-    "ckb": {
-      "typeScript": {
-        "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
-        "hashType": "data2",
-        "args": "0xa6089af0dd8bd9d9cfaaecda60ba91f097f38a92c053cefb5b30921fd41fa70a"
-      },
-      "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
-      "codeVersion": 2,
-      "createdTx": "0x8d34122996e3158ec90bfd12a3aa6668c41866b9051b8a011f36c4c0f28666fb",
-      "createdAt": "2026-09-25T12:52:16.076Z",
+      "typeHash": "0xf5ed9644d2100a1d588222b8f80236be3579a7b735ae83c5a82063c94ef6faff",
+      "codeVersion": 3,
+      "createdTx": "0x979346fc072d91bd9e1f91f9a4fb56751a3b0527e883bc2d61460c902b483c79",
+      "createdAt": "2026-09-26T22:26:35.766Z",
       "publishers": 1,
       "rotations": []
     }
@@ -222,6 +264,84 @@
         "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
         "publishers": 1
       }
+    },
+    {
+      "action": "retire:code",
+      "txHash": "0x15c2a7693b0cc0d2f36a27e46cea8be5f9e58bb9f45be2a58ab0807b41e34604",
+      "at": "2026-09-26T22:04:10.217Z",
+      "detail": {
+        "contract": "priceFeedType",
+        "version": 2
+      }
+    },
+    {
+      "action": "retire:committee",
+      "txHash": "0xbe47f4efa296dfb5b6e9510d992d92992a0a83d58097b1c23c49f9422656156a",
+      "at": "2026-09-26T22:20:32.677Z",
+      "detail": {
+        "name": "majors",
+        "typeHash": "0xb167a0145feff4716498c087dcc4d225bbab63661d8f8b2e854bcaba8b3bb5a8",
+        "reason": "v3 freeze: replaced by new majors (CKB pairs merged)"
+      }
+    },
+    {
+      "action": "retire:committee",
+      "txHash": "0x8d34122996e3158ec90bfd12a3aa6668c41866b9051b8a011f36c4c0f28666fb",
+      "at": "2026-09-26T22:21:01.438Z",
+      "detail": {
+        "name": "ckb",
+        "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
+        "reason": "v3 freeze: merged into majors"
+      }
+    },
+    {
+      "action": "retire:code",
+      "txHash": "0xc7446926f87439f0e9140d18bd3e999d7eb8a6e8825bb0dade519afaabc10389",
+      "at": "2026-09-26T22:23:50.385Z",
+      "detail": {
+        "contract": "publisherSetType",
+        "version": 2
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0xad68ecd84054383a35d01ff37877e83b95c1c1abe82dbef2b2d4414690480e31",
+      "at": "2026-09-26T22:24:50.548Z",
+      "detail": {
+        "contract": "priceFeedType",
+        "version": 3,
+        "codeHash": "0x0cfb92a77c98b8b90731aedcb19ee0b12827e73c133e2448d50b3fa9ba8da876"
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0xdc6c74159313e35e0b8ffcc19fe1d48e1626e365792381c0a5c77ce0eb346008",
+      "at": "2026-09-26T22:25:23.212Z",
+      "detail": {
+        "contract": "publisherSetType",
+        "version": 3,
+        "codeHash": "0xe8eaf1bd1db480480b1a48513d8a4508901ca392dd7acd1fc9c8e2bb62f3d636"
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0xe86a9e2e122468f310c7bb945b7b25cc26b2da120d457d74f92e937f611331eb",
+      "at": "2026-09-26T22:25:38.404Z",
+      "detail": {
+        "contract": "alwaysSuccessLock",
+        "version": 1,
+        "codeHash": "0x2a2e548b4f39e77ef743b0492b98f0d9714fbad789a4b484248311b5402b5ca9"
+      }
+    },
+    {
+      "action": "deploy:committee",
+      "txHash": "0x979346fc072d91bd9e1f91f9a4fb56751a3b0527e883bc2d61460c902b483c79",
+      "at": "2026-09-26T22:26:35.766Z",
+      "detail": {
+        "name": "majors",
+        "typeHash": "0xf5ed9644d2100a1d588222b8f80236be3579a7b735ae83c5a82063c94ef6faff",
+        "publishers": 1
+      }
     }
   ],
   "retiredCommittees": [
@@ -256,6 +376,38 @@
       "name": "ckb",
       "retiredAt": "2026-09-25T12:49:42.232Z",
       "reason": "v1 contracts were not reproducible; replaced by committees on v2"
+    },
+    {
+      "typeScript": {
+        "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
+        "hashType": "data2",
+        "args": "0x091472b13e21ffcabbb8bca728fcb5251850f76531526d19652c596724e5a38a"
+      },
+      "typeHash": "0xb167a0145feff4716498c087dcc4d225bbab63661d8f8b2e854bcaba8b3bb5a8",
+      "codeVersion": 2,
+      "createdTx": "0xbe47f4efa296dfb5b6e9510d992d92992a0a83d58097b1c23c49f9422656156a",
+      "createdAt": "2026-09-25T12:51:51.167Z",
+      "publishers": 1,
+      "rotations": [],
+      "name": "majors",
+      "retiredAt": "2026-09-26T22:20:32.677Z",
+      "reason": "v3 freeze: replaced by new majors (CKB pairs merged)"
+    },
+    {
+      "typeScript": {
+        "codeHash": "0xa04e6a4112163c2e82823bf90a32bf3f9e704ac9a11427ff0c708b6080d34ec1",
+        "hashType": "data2",
+        "args": "0xa6089af0dd8bd9d9cfaaecda60ba91f097f38a92c053cefb5b30921fd41fa70a"
+      },
+      "typeHash": "0xac9dda4ae04025c303fc814c175bc7590295c46ad72f1ba49e6cacf714804f2c",
+      "codeVersion": 2,
+      "createdTx": "0x8d34122996e3158ec90bfd12a3aa6668c41866b9051b8a011f36c4c0f28666fb",
+      "createdAt": "2026-09-25T12:52:16.076Z",
+      "publishers": 1,
+      "rotations": [],
+      "name": "ckb",
+      "retiredAt": "2026-09-26T22:21:01.438Z",
+      "reason": "v3 freeze: merged into majors"
     }
   ]
 }

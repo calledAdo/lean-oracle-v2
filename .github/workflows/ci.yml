@@ -29,6 +29,7 @@ jobs:
           path: |
             target/riscv64imac-unknown-none-elf/release/price_feed_type
             target/riscv64imac-unknown-none-elf/release/publisher_set_type
+            target/riscv64imac-unknown-none-elf/release/always_success_lock
 
   node:
     name: SDK, publisher, mirror, deploy tool

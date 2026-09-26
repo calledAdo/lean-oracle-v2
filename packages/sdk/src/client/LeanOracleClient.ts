@@ -10,10 +10,10 @@ import { MirrorClient } from "../mirror/client.js";
 import { toFeedId, type MirrorPrice, type MirrorUpdate } from "../mirror/format.js";
 import { requireDeployment, type LeanOracleNetworkPreset } from "../presets/networks.js";
 import type { CommitteeRef, LeanOracleDeployment } from "../presets/deployment.js";
-import type { PriceFeedData } from "../protocol/priceFeed.js";
+import { isFeedPriceTrusted, type PriceFeedData } from "../protocol/priceFeed.js";
 import type { PriceUpdate } from "../protocol/priceUpdate.js";
 import type { PublisherSetData } from "../protocol/publisherSet.js";
-import { burnFeedCell, createFeedCell, updateFeedCell, type UpdateFeedCellResult } from "../tx/feed.js";
+import { burnFeedCell, createFeedCell, updateFeedCell, updateFeedCells, type UpdateFeedCellResult, type UpdateFeedCellsResult } from "../tx/feed.js";
 import { completeFee, type CompleteFeeOptions, type CompleteFeeResult } from "../tx/fees.js";
 import { pullAndUpdate } from "../tx/pull.js";
 import type { Hex, Script } from "../types.js";
@@ -97,6 +97,24 @@ export class LeanOracleClient {
   /** Draft moving a feed cell forward to an update you already have. */
   updateFeedCell(feedType: Script, update: Hex | Uint8Array | PriceUpdate): Promise<UpdateFeedCellResult> {
     return updateFeedCell({ client: this.cccClient, deployment: this.deployment, feedType, update });
+  }
+
+  /**
+   * Draft moving several feed cells of one committee to the same update in one transaction: the
+   * committee's signatures are checked once on chain, so N feeds cost about as much as one.
+   */
+  updateFeedCells(feedTypes: Script[], update: Hex | Uint8Array | PriceUpdate): Promise<UpdateFeedCellsResult> {
+    return updateFeedCells({ client: this.cccClient, deployment: this.deployment, feedTypes, update });
+  }
+
+  /**
+   * Whether a feed cell's price may be used now: authenticated, and its committee is not paused and
+   * still trusts the key set that signed it (same rule as the Rust consumer helper).
+   */
+  async isFeedPriceTrusted(feed: LiveCell<PriceFeedData>): Promise<boolean> {
+    const name = Object.entries(this.deployment.committees).find(([, c]) => c.typeHash.toLowerCase() === feed.data.publisherSetTypeHash.toLowerCase())?.[0];
+    if (!name) return false;
+    return isFeedPriceTrusted(feed.data, (await this.getCommittee(name)).data);
   }
 
   /** Draft moving a feed cell to the mirror's latest (or `atMs`) update. */

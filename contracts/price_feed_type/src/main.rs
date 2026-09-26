@@ -5,7 +5,15 @@
 //! - Create (0 → 1): data is configuration only (price/time fields zero), `args[32..]` is the
 //!   Type ID seed of this output, and the anchored PublisherSet dep is present and valid.
 //! - Update (1 → 1): configuration unchanged, `publish_time_ms` strictly increases, and the
-//!   output equals a price update authenticated by the current PublisherSet quorum.
+//!   output equals a price update authenticated by the committee (current set, or the previous set
+//!   for ticks before its switch).
+//!
+//! Several feed cells of one committee may move in one transaction and share one verification:
+//! the **leader** is the lowest-index input that is an updating feed cell (same code, same
+//! committee, with a continuing output). Its witness carries the only update blob. The leader checks
+//! the committee's signatures once; every feed cell (leader included) takes its own entry and Merkle
+//! proof from that same blob. A cell being burned is never a leader, and a feed whose entry is not
+//! in the leader's blob fails, so one transaction uses exactly one signed header per committee.
 //! - Burn (1 → 0): the lock alone decides.
 
 #![no_std]
@@ -27,10 +35,11 @@ use ckb_std::{
     error::SysError,
     high_level::{load_cell_data, load_cell_type, load_cell_type_hash, load_input, load_script, load_witness_args, QueryIter},
 };
+use ckb_std::ckb_types::packed::Script;
 use lean_oracle_common::{
     errors::*,
     price_feed::PriceFeedData,
-    price_update::{verify_price_update, VerifyError},
+    price_update::{find_entry, verify_header, PriceUpdateBlob, VerifiedPrice, VerifyError},
     protocol_hash::type_id_seed,
     publisher_set::PublisherSetData,
 };
@@ -89,25 +98,78 @@ fn validate_update(feed_id: &[u8; 32]) -> i8 {
     if new.publish_time_ms <= old.publish_time_ms {
         return ERROR_FEED_NOT_FORWARD;
     }
-    let blob = match load_update_blob() { Ok(value) => value, Err(code) => return code };
-    let publisher_set = match load_publisher_set(&new.publisher_set_type_hash) { Ok(value) => value, Err(code) => return code };
-    let verified = match verify_price_update(&blob, feed_id, &new.publisher_set_type_hash, &publisher_set) {
-        Ok(value) => value,
-        Err(VerifyError::Malformed) => return ERROR_UPDATE_MALFORMED,
-        Err(VerifyError::FeedNotFound | VerifyError::DuplicateFeed) => return ERROR_UPDATE_FEED_NOT_FOUND,
-        Err(VerifyError::Proof) => return ERROR_UPDATE_PROOF,
-        Err(VerifyError::PublisherSet | VerifyError::Paused | VerifyError::SetIndex) => return ERROR_UPDATE_SET,
-        Err(VerifyError::Signature) => return ERROR_UPDATE_SIGNATURE,
-    };
-    if !new.matches(&verified) {
+    let script = match load_script() { Ok(value) => value, Err(_) => return ERROR_SYSCALL };
+    let (leader, is_self) = match find_leader(&script, &new.publisher_set_type_hash) { Ok(value) => value, Err(code) => return code };
+    let blob = match load_update_blob(leader) { Ok(value) => value, Err(code) => return code };
+    let update = match PriceUpdateBlob::from_bytes(&blob) { Some(value) => value, None => return ERROR_UPDATE_MALFORMED };
+    if is_self {
+        let publisher_set = match load_publisher_set(&new.publisher_set_type_hash) { Ok(value) => value, Err(code) => return code };
+        if let Err(error) = verify_header(&update.header, &update.signatures, &new.publisher_set_type_hash, &publisher_set) {
+            return verify_error_code(error);
+        }
+    } else if update.header.publisher_set_type_hash != new.publisher_set_type_hash {
+        return ERROR_UPDATE_SET;
+    }
+    let message = match find_entry(&update, feed_id) { Ok(value) => value, Err(error) => return verify_error_code(error) };
+    if !new.matches(&VerifiedPrice { header: update.header, message }) {
         return ERROR_UPDATE_MISMATCH;
     }
     0
 }
 
-/// Witness: `WitnessArgs.input_type` of group input 0 = `update_len u32 LE | update blob`.
-fn load_update_blob() -> Result<alloc::vec::Vec<u8>, i8> {
-    let args = load_witness_args(0, Source::GroupInput).map_err(|_| ERROR_FEED_WITNESS_MALFORMED)?;
+fn verify_error_code(error: VerifyError) -> i8 {
+    match error {
+        VerifyError::Malformed => ERROR_UPDATE_MALFORMED,
+        VerifyError::FeedNotFound | VerifyError::DuplicateFeed => ERROR_UPDATE_FEED_NOT_FOUND,
+        VerifyError::Proof => ERROR_UPDATE_PROOF,
+        VerifyError::PublisherSet | VerifyError::Paused | VerifyError::SetIndex => ERROR_UPDATE_SET,
+        VerifyError::Signature => ERROR_UPDATE_SIGNATURE,
+    }
+}
+
+/// The leader for this committee in this transaction: the lowest-index input whose type script has
+/// this script's code, whose data names the same committee, and which continues as an output (an
+/// update, not a burn). Returns its input index and whether it is this cell.
+fn find_leader(script: &Script, committee: &[u8; 32]) -> Result<(usize, bool), i8> {
+    let mut index = 0usize;
+    loop {
+        match load_cell_type(index, Source::Input) {
+            Ok(Some(candidate)) if candidate.code_hash().as_slice() == script.code_hash().as_slice()
+                && candidate.hash_type().as_slice() == script.hash_type().as_slice() =>
+            {
+                let same_committee = load_cell_data(index, Source::Input)
+                    .ok()
+                    .and_then(|data| PriceFeedData::from_bytes(&data))
+                    .map_or(false, |feed| &feed.publisher_set_type_hash == committee);
+                if same_committee && continues(&candidate)? {
+                    return Ok((index, candidate.as_slice() == script.as_slice()));
+                }
+            }
+            Ok(_) => {}
+            Err(SysError::IndexOutOfBound) => return Err(ERROR_FEED_LEADER),
+            Err(_) => return Err(ERROR_SYSCALL),
+        }
+        index += 1;
+    }
+}
+
+/// Whether an output carries exactly this type script (Type ID args make it unique).
+fn continues(candidate: &Script) -> Result<bool, i8> {
+    let mut index = 0usize;
+    loop {
+        match load_cell_type(index, Source::Output) {
+            Ok(Some(output)) if output.as_slice() == candidate.as_slice() => return Ok(true),
+            Ok(_) => {}
+            Err(SysError::IndexOutOfBound) => return Ok(false),
+            Err(_) => return Err(ERROR_SYSCALL),
+        }
+        index += 1;
+    }
+}
+
+/// Witness: `WitnessArgs.input_type` of the leader's input = `update_len u32 LE | update blob`.
+fn load_update_blob(leader: usize) -> Result<alloc::vec::Vec<u8>, i8> {
+    let args = load_witness_args(leader, Source::Input).map_err(|_| ERROR_FEED_WITNESS_MALFORMED)?;
     let bytes = args.input_type().to_opt().ok_or(ERROR_FEED_WITNESS_MALFORMED)?.raw_data();
     if bytes.len() < 4 {
         return Err(ERROR_FEED_WITNESS_MALFORMED);

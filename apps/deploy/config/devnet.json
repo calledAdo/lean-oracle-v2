@@ -11,7 +11,8 @@
   },
   "binaries": {
     "priceFeedType": "target/riscv64imac-unknown-none-elf/release/price_feed_type",
-    "publisherSetType": "target/riscv64imac-unknown-none-elf/release/publisher_set_type"
+    "publisherSetType": "target/riscv64imac-unknown-none-elf/release/publisher_set_type",
+    "alwaysSuccessLock": "target/riscv64imac-unknown-none-elf/release/always_success_lock"
   },
   "committees": {}
 }

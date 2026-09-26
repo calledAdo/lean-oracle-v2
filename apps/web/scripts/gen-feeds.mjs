@@ -12,15 +12,15 @@ const deployment = read("deployments/testnet.json");
 const VENUE = { binance: "Binance", coinbase: "Coinbase", kraken: "Kraken", bitstamp: "Bitstamp", okx: "OKX", bybit: "Bybit", gate: "Gate", bitget: "Bitget", kucoin: "KuCoin", mexc: "MEXC", upbit: "Upbit" };
 
 // What kind of market a feed prices, and what that means for a consumer.
-function category(symbol, committee) {
+function category(symbol) {
   if (symbol === "Crypto.USDT/USD") return { name: "Stablecoin rate", note: "Tracks the USDT peg. Use it to convert /USDT prices to USD, and watch it for depegs." };
-  if (committee === "ckb") return { name: "Thinner liquidity", note: "CKB trades on fewer venues with less depth than the majors. Prices move more between ticks and confidence is wider; set conservative bounds." };
+  if (symbol.startsWith("Crypto.CKB/")) return { name: "Thinner liquidity", note: "CKB trades on fewer venues with less depth than the majors. Prices move more between ticks and confidence is wider; set conservative bounds." };
   return { name: "Deep liquidity", note: "Among the most traded crypto markets, priced from several large exchanges." };
 }
 
 const committees = {};
 const feeds = [];
-for (const name of ["majors", "ckb"]) {
+for (const name of ["majors"]) {
   const t = read(`apps/publisher/configs/${name}.template.json`);
   const c = deployment.committees[name];
   committees[name] = {
@@ -54,7 +54,7 @@ for (const name of ["majors", "ckb"]) {
       toleranceBps: f.toleranceBps,
       emaHalfLifeMs: f.emaHalfLifeMs,
       markets: f.markets.map((m) => ({ venue: VENUE[m.venue] ?? m.venue, market: m.market })),
-      category: category(f.symbol, name),
+      category: category(f.symbol),
     });
   }
 }

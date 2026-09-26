@@ -172,8 +172,10 @@ export class PublisherNode {
     if (rank < 0 || state.proposedRanks.has(rank)) return;
     if (BigInt(this.now()) < slotOpensAt(tickMs, rank, active.config.observationDeadlineMs)) return;
     // A backup first learns what its peers hold (observations, best proposal); the scheduler calls
-    // again shortly after.
-    if (rank > 0 && !state.requestedTick && !state.best && state.observations.size < this.n) {
+    // again shortly after. It asks even when it already holds every observation: an earlier rank may
+    // have proposed a header that peers signed, and only re-proposing that header can still finalize
+    // (a peer that signed it will not sign a different header for the tick).
+    if (rank > 0 && !state.requestedTick && !state.best) {
       state.requestedTick = true;
       this.o.transport.broadcast(encodeMessage({ type: "tick_request", tickMs }));
       return;

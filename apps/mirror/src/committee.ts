@@ -1,13 +1,16 @@
 //! A committee as the mirror sees it: its publisher sets over time, and full verification of
 //! finalized updates against them.
 //!
-//! The mirror keeps every set it has observed. An update signed by a set that has since been
-//! rotated out is accepted only if its tick is older than the moment the mirror first saw the
-//! newer set, so a retired (possibly compromised) set cannot add history after its retirement.
+//! The mirror keeps every set it has observed. The committee cell names the previous set and the
+//! first tick of the current one (`previous.untilMs`), so an update from the previous set is accepted
+//! only for ticks before that, the same rule the feed contract applies. A set the mirror saw retire
+//! earlier keeps the bound it had. When the committee revokes the previous set, the mirror stops
+//! accepting anything new from it (history already stored stays served).
 
 import { readFileSync } from "node:fs";
 
 import {
+  GOVERNANCE_PAUSED,
   decodePriceUpdate,
   decodePublisherSetData,
   encodePriceMessage,
@@ -35,6 +38,8 @@ export class Committee {
   readonly typeHash: Hex;
   private readonly sets = new Map<number, KnownSet>();
   private currentIndex: number | undefined;
+  /** The committee cell's PAUSED flag: while set, nothing new is accepted (as on chain). */
+  private paused = false;
   private timer: NodeJS.Timeout | undefined;
 
   constructor(
@@ -65,15 +70,38 @@ export class Committee {
     this.observe(data);
   }
 
-  /** Record the committee cell's current set. */
+  /** Record the committee cell's current state: its current set and, if kept, the previous one. */
   observe(data: PublisherSetData): void {
     const index = data.current.setIndex;
-    if (index === this.currentIndex) return;
     if (this.currentIndex !== undefined && index < this.currentIndex) return;
-    if (this.currentIndex !== undefined) this.sets.get(this.currentIndex)!.retiredAtMs = this.now();
-    this.sets.set(index, { set: data.current });
-    this.currentIndex = index;
-    this.log("committee.set", { committee: this.name, setIndex: index, publishers: data.current.pubkeys.length });
+    const changed = index !== this.currentIndex;
+    const paused = (data.governanceFlags & GOVERNANCE_PAUSED) !== 0;
+    if (paused !== this.paused) this.log(paused ? "committee.paused" : "committee.unpaused", { committee: this.name });
+    this.paused = paused;
+    // Older sets this mirror knows are retired. The immediate predecessor is bounded by the on-chain
+    // switch tick, or revoked (bound 0) when the cell no longer keeps it; sets retired earlier keep the
+    // bound they already had (they were aged out by a later rotation, not revoked).
+    for (const [i, known] of this.sets) {
+      if (i === index) continue;
+      let bound: number;
+      if (i === index - 1) {
+        const kept = data.previous?.set.setIndex === i;
+        bound = kept ? Number(data.previous!.untilMs) : 0;
+        if (!kept && known.retiredAtMs !== 0) this.log("committee.previous_revoked", { committee: this.name, setIndex: i });
+      } else {
+        bound = known.retiredAtMs ?? this.now();
+      }
+      if (known.retiredAtMs === undefined || bound < known.retiredAtMs) known.retiredAtMs = bound;
+    }
+    if (data.previous && !this.sets.has(data.previous.set.setIndex)) {
+      // Learned from the chain (e.g. after a restart): history of the previous set stays verifiable.
+      this.sets.set(data.previous.set.setIndex, { set: data.previous.set, retiredAtMs: Number(data.previous.untilMs) });
+    }
+    if (changed) {
+      this.sets.set(index, { set: data.current });
+      this.currentIndex = index;
+      this.log("committee.set", { committee: this.name, setIndex: index, publishers: data.current.pubkeys.length, previous: data.previous?.set.setIndex ?? null });
+    }
   }
 
   get ready(): boolean {
@@ -88,6 +116,7 @@ export class Committee {
     const update = decodePriceUpdate(blob);
     const { header } = update;
     if (header.publisherSetTypeHash.toLowerCase() !== this.typeHash) throw new Error("another committee");
+    if (this.paused) throw new Error("committee is paused");
     const known = this.sets.get(header.setIndex);
     if (!known) throw new Error(`unknown set index ${header.setIndex}`);
     if (known.retiredAtMs !== undefined && Number(header.publishTimeMs) >= known.retiredAtMs) throw new Error("signed by a retired set after its retirement");

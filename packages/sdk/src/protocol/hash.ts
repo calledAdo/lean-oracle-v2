@@ -8,9 +8,9 @@ import type { Hex } from "../types.js";
 const encoder = new TextEncoder();
 const CKB_PERSONALIZATION = encoder.encode("ckb-default-hash");
 
-export const DOMAIN_SET_STATE = encoder.encode("LEAN/PUBLISHER_SET_STATE/V1");
-export const DOMAIN_SET_UPDATE = encoder.encode("LEAN/PUBLISHER_SET_UPDATE/V1");
-export const DOMAIN_SET_POP = encoder.encode("LEAN/PUBLISHER_SET_POP/V1");
+export const DOMAIN_SET_STATE = encoder.encode("LEAN/PUBLISHER_SET_STATE/V2");
+export const DOMAIN_SET_UPDATE = encoder.encode("LEAN/PUBLISHER_SET_UPDATE/V2");
+export const DOMAIN_SET_POP = encoder.encode("LEAN/PUBLISHER_SET_POP/V2");
 export const DOMAIN_FEED = encoder.encode("LEAN/FEED/V1");
 export const DOMAIN_PRICE_UPDATE = encoder.encode("LEAN/PRICE_UPDATE/V1");
 export const DOMAIN_PRICE_LEAF = encoder.encode("LEAN/PRICE_LEAF/V1");

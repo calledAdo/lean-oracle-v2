@@ -1,0 +1,11 @@
+[package]
+name = "always_success_lock"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ckb-std = { version = "1.0", default-features = false, features = ["allocator", "dummy-atomic"] }
+
+[[bin]]
+name = "always_success_lock"
+path = "src/main.rs"

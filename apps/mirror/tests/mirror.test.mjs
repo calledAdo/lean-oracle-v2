@@ -139,17 +139,71 @@ test("rate limits per IP and per API key", async () => {
   }
 });
 
-test("a rotated-out set can only vouch for ticks before its retirement", async () => {
+test("the previous set vouches only for ticks before the on-chain switch, until revoked", async () => {
   const { Committee } = await import("../dist/committee.js");
   const c = makeCommittee(4);
   await c.runTick(T0);
   const blob = c.nodes[0].store.finalizedAt(BigInt(T0));
-  const next = { ...c.publisherSet, current: { setIndex: 1, pubkeys: c.publisherSet.current.pubkeys } };
-  for (const [retiredAt, accepted] of [[T0 + 1, true], [T0, false]]) {
-    const committee = new Committee({ name: "majors", publisherSetTypeHash: SET_TYPE_HASH, publishers: [] }, undefined, () => retiredAt);
+  const rotatedAt = (untilMs) => ({
+    ...c.publisherSet,
+    governanceNonce: 1n,
+    current: { setIndex: 1, pubkeys: c.publisherSet.current.pubkeys },
+    previous: { set: c.publisherSet.current, untilMs: BigInt(untilMs) },
+  });
+  const fresh = () => new Committee({ name: "majors", publisherSetTypeHash: SET_TYPE_HASH, publishers: [] });
+
+  // Switch after the tick: accepted; at the tick: rejected.
+  for (const [until, accepted] of [[T0 + 1, true], [T0, false]]) {
+    const committee = fresh();
     committee.observe(c.publisherSet);
-    committee.observe(next);
+    committee.observe(rotatedAt(until));
     if (accepted) committee.verify(blob);
     else assert.throws(() => committee.verify(blob), /retired set/);
   }
+
+  // A mirror that starts after the rotation learns the previous set from the committee cell.
+  const restarted = fresh();
+  restarted.observe(rotatedAt(T0 + 1));
+  restarted.verify(blob);
+
+  // Revoking the previous set stops new ingestion from it.
+  const revoked = fresh();
+  revoked.observe(c.publisherSet);
+  revoked.observe(rotatedAt(T0 + 1));
+  const { previous: _gone, ...withoutPrevious } = rotatedAt(T0 + 1);
+  revoked.observe({ ...withoutPrevious, governanceNonce: 2n });
+  assert.throws(() => revoked.verify(blob), /retired set/);
+
+  // A second routine rotation ages set 0 out without erasing its old bound: history before it
+  // still verifies, as it did while set 0 was current or previous.
+  const twice = fresh();
+  twice.observe(c.publisherSet);
+  twice.observe(rotatedAt(T0 + 1));
+  twice.observe({ ...rotatedAt(T0 + 1), governanceNonce: 2n, current: { setIndex: 2, pubkeys: c.publisherSet.current.pubkeys }, previous: { set: { setIndex: 1, pubkeys: c.publisherSet.current.pubkeys }, untilMs: BigInt(T0 + 5000) } });
+  twice.verify(blob);
+
+  // While the committee is paused, nothing new is accepted.
+  const paused = fresh();
+  paused.observe({ ...c.publisherSet, governanceFlags: p.GOVERNANCE_PAUSED });
+  assert.throws(() => paused.verify(blob), /paused/);
+  paused.observe({ ...c.publisherSet, governanceNonce: 2n });
+  paused.verify(blob);
+});
+
+test("a store from an older data format is refused, not served", async () => {
+  const { MirrorStore } = await import("../dist/store.js");
+  const { DatabaseSync } = await import("node:sqlite");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "lean-store-"));
+  // A fresh store is stamped with the current format and reopens fine.
+  new MirrorStore(join(dir, "fresh.sqlite")).close();
+  new MirrorStore(join(dir, "fresh.sqlite")).close();
+  // A pre-format store that already holds rows (as v1 volumes do) is refused.
+  const legacy = new DatabaseSync(join(dir, "legacy.sqlite"));
+  legacy.exec("CREATE TABLE updates (committee TEXT, tick_ms INTEGER, header_hash TEXT NOT NULL, blob BLOB NOT NULL, received_ms INTEGER NOT NULL, PRIMARY KEY (committee, tick_ms))");
+  legacy.exec("INSERT INTO updates VALUES ('0x00', 1, '0x00', x'00', 1)");
+  legacy.close();
+  assert.throws(() => new MirrorStore(join(dir, "legacy.sqlite")), /older data format/);
 });

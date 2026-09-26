@@ -11,13 +11,17 @@ use ckb_testtool::{
     },
     context::Context,
 };
-use lean_oracle_common::price_feed::PriceFeedData;
+use lean_oracle_common::{
+    price_feed::PriceFeedData,
+    publisher_set::{PublisherSetData, GOVERNANCE_PAUSED},
+};
 
-use crate::fixtures::btc;
+use crate::fixtures::{btc, Committee};
 
 const MAX_CYCLES: u64 = 10_000_000;
 const LOCKED: u64 = 500_00000000;
 const CREATED_AT: u64 = 1_700_000_000_000;
+/// Placeholder in `btc_feed`; replaced by the test committee cell's real type hash.
 const COMMITTEE: [u8; 32] = [0xc0; 32];
 
 struct Env {
@@ -28,6 +32,10 @@ struct Env {
     beneficiary: Script,
     keeper: Script,
     feed_type: Script,
+    committee_type: Script,
+    committee_hash: [u8; 32],
+    /// Committee cell data used as the dep in trigger transactions.
+    committee: PublisherSetData,
 }
 
 struct Order {
@@ -48,13 +56,16 @@ impl Env {
         let keeper = context.build_script(&always, Bytes::from_static(b"keeper")).unwrap();
         // Only the feed cell's type hash matters to the lock (its own script does not run as a dep).
         let feed_type = context.build_script(&always, Bytes::from_static(b"btc-feed-cell")).unwrap();
-        Self { context, lock_code, always, owner, beneficiary, keeper, feed_type }
+        let committee_type = context.build_script(&always, Bytes::from_static(b"committee")).unwrap();
+        let committee_hash = committee_type.calc_script_hash().unpack();
+        let committee = Committee::new(1, 0).data;
+        Self { context, lock_code, always, owner, beneficiary, keeper, feed_type, committee_type, committee_hash, committee }
     }
 
     fn lock(&mut self, order: &Order) -> Script {
         let hash = |s: &Script| -> [u8; 32] { s.calc_script_hash().unpack() };
         let mut args = hash(&self.feed_type).to_vec();
-        args.extend_from_slice(&COMMITTEE);
+        args.extend_from_slice(&self.committee_hash);
         args.extend_from_slice(&btc());
         args.extend_from_slice(&order.strike.to_le_bytes());
         args.extend_from_slice(&order.expo.to_le_bytes());
@@ -75,9 +86,21 @@ impl Env {
     }
 
     fn feed_dep(&mut self, feed: &PriceFeedData) -> CellDep {
+        let mut feed = feed.clone();
+        if feed.publisher_set_type_hash == COMMITTEE {
+            feed.publisher_set_type_hash = self.committee_hash;
+        }
         let cell = self.context.create_cell(
             CellOutput::new_builder().capacity(300_00000000u64).lock(self.keeper.clone()).type_(Some(self.feed_type.clone()).pack()).build(),
             Bytes::from(feed.to_bytes()),
+        );
+        CellDep::new_builder().out_point(cell).build()
+    }
+
+    fn committee_dep(&mut self) -> CellDep {
+        let cell = self.context.create_cell(
+            CellOutput::new_builder().capacity(300_00000000u64).lock(self.keeper.clone()).type_(Some(self.committee_type.clone()).pack()).build(),
+            Bytes::from(self.committee.to_bytes()),
         );
         CellDep::new_builder().out_point(cell).build()
     }
@@ -96,6 +119,7 @@ impl Env {
         ];
         if let Some(feed) = feed {
             deps.push(self.feed_dep(feed));
+            deps.push(self.committee_dep());
         }
         let fee_input = self.input_with(self.keeper.clone());
         let mut tx = TransactionBuilder::default()
@@ -164,6 +188,17 @@ fn feed_cell_is_checked() {
     assert_code(env.trigger(&ABOVE_80K, Some(&PriceFeedData { publisher_set_type_hash: [0xee; 32], ..btc_feed(1_000) }), true, LOCKED), 104);
     assert_code(env.trigger(&ABOVE_80K, Some(&PriceFeedData { publish_time_ms: 0, ..btc_feed(1_000) }), true, LOCKED), 105);
     assert_code(env.trigger(&ABOVE_80K, Some(&PriceFeedData { feed_id: [3; 32], ..btc_feed(1_000) }), true, LOCKED), 103);
+}
+
+#[test]
+fn committee_must_stand_behind_the_price() {
+    let mut env = Env::new();
+    // Paused committee: no price is usable.
+    env.committee.governance_flags = GOVERNANCE_PAUSED;
+    assert_code(env.trigger(&ABOVE_80K, Some(&btc_feed(1_000)), true, LOCKED), 112);
+    // The price was signed by set 0, which is no longer current or previous.
+    env.committee = Committee::new(1, 3).data;
+    assert_code(env.trigger(&ABOVE_80K, Some(&btc_feed(1_000)), true, LOCKED), 113);
 }
 
 #[test]

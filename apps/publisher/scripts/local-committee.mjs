@@ -33,7 +33,7 @@ const basePort = Number(values["base-port"]);
 const keys = (values.keys ? values.keys.split(",") : Array.from({ length: n }, () => p.bytesToHex(randomBytes(32))))
   .map((key) => ({ key, pubkey: pub.publicKeyOf(key) }))
   .sort((a, b) => (a.pubkey < b.pubkey ? -1 : 1));
-const publisherSet = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, current: { setIndex: 0, pubkeys: keys.map((k) => k.pubkey) } };
+const publisherSet = { networkId: `0x${"00".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS: 86_400n, current: { setIndex: 0, pubkeys: keys.map((k) => k.pubkey) } };
 // Until the committee cell is deployed, a placeholder committee id stands in for its type hash.
 const publisherSetTypeHash = (values["publisher-set-type-hash"] ?? p.bytesToHex(randomBytes(32))).toLowerCase();
 const chain = values["chain-rpc"] ? { rpcUrl: values["chain-rpc"], typeScript: JSON.parse(values["committee-type-script"]) } : undefined;

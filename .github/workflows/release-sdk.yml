@@ -17,6 +17,9 @@ jobs:
     environment: npm
     steps:
       - uses: actions/checkout@v4
+      # The SDK presets must describe contracts this SDK's formats match.
+      - name: Testnet runs the contracts this source builds
+        run: node scripts/check-deployment-matches-code.mjs testnet
       - uses: actions/setup-node@v4
         with:
           node-version: 24

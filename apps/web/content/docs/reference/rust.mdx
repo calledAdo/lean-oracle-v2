@@ -16,15 +16,15 @@ The crate is `no_std` and works in any CKB script.
 them.
 
 ```rust
-pub fn check_feed_cell(data: &[u8], feed_id: &[u8; 32], committee_type_hash: &[u8; 32])
-    -> Result<PriceFeedData, FeedCheckError>;
+pub fn check_feed_cell(data: &[u8], feed_id: &[u8; 32], committee_type_hash: &[u8; 32],
+    committee: &PublisherSetData) -> Result<PriceFeedData, FeedCheckError>;
 pub fn published_after(feed: &PriceFeedData, not_before_ms: u64) -> Result<(), FeedCheckError>;
 pub fn price_at_expo(feed: &PriceFeedData, expo: i32) -> Option<i64>;
 ```
 
 | Function | Checks |
 |---|---|
-| `check_feed_cell` | The data decodes, is the expected feed and committee, and holds a verified price |
+| `check_feed_cell` | The data decodes, is the expected feed and committee, holds a verified price, and the committee (loaded from its cell dep) is not paused and still trusts the key set that signed it |
 | `published_after` | The price was published strictly after a time you can prove |
 | `price_at_expo` | Rescales the price to another exponent, or `None` on overflow |
 
@@ -49,7 +49,7 @@ suits scripts that need a price at one exact time.
 
 ## Feed cell data
 
-125 bytes, little endian:
+129 bytes, little endian:
 
 | Offset | Field | Type |
 |---|---|---|
@@ -64,3 +64,4 @@ suits scripts that need a price at one exact time.
 | 108 | ema_conf | u64 |
 | 116 | source_time_ms | u64 |
 | 124 | num_publishers | u8 |
+| 125 | set_index | u32 |

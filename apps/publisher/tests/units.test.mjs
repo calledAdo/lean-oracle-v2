@@ -24,3 +24,20 @@ test("integer EMA and tolerance", () => {
   assert.ok(withinTolerance(10_050n, 10_000n, 50));
   assert.ok(!withinTolerance(10_051n, 10_000n, 50));
 });
+
+test("store: an older data format is refused, a fresh store is stamped", async () => {
+  const { PublisherStore } = await import("../dist/store.js");
+  const { DatabaseSync } = await import("node:sqlite");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "lean-pstore-"));
+  const committee = `0x${"ab".repeat(32)}`;
+  new PublisherStore(join(dir, "fresh.sqlite"), committee).close();
+  new PublisherStore(join(dir, "fresh.sqlite"), committee).close();
+  const legacy = new DatabaseSync(join(dir, "legacy.sqlite"));
+  legacy.exec("CREATE TABLE finalized (committee TEXT, tick_ms INTEGER, blob BLOB NOT NULL, PRIMARY KEY (committee, tick_ms))");
+  legacy.exec("INSERT INTO finalized VALUES ('x', 1, x'00')");
+  legacy.close();
+  assert.throws(() => new PublisherStore(join(dir, "legacy.sqlite"), committee), /older data format/);
+});

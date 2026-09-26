@@ -3,7 +3,7 @@ import data from "@/data/committees.json";
 import { CopyValue } from "./copy";
 
 /** One committee: its cell, publishers, quorum, cadence and feeds. */
-export function CommitteeDetail({ name }: { name: "majors" | "ckb" }) {
+export function CommitteeDetail({ name }: { name: "majors" }) {
   const c = data.committees[name];
   const feeds = data.feeds.filter((f) => f.committee === name);
   return (

@@ -82,7 +82,7 @@ export function Convergence() {
     </div>
     <figcaption className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
       <span className="size-1.5 rounded-full bg-[var(--proof)]" />
-      Latest signed BTC/USDT
+      BTC/USDT
       <span className="font-mono text-foreground tabular-nums">{btc ? formatPrice(btc.price) : "…"}</span>
     </figcaption>
     </figure>

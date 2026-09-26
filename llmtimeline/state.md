@@ -1,6 +1,6 @@
 > llmtimeline · cross-agent work record. state.md is the live snapshot — rewrite it in place. sessions/ is append-only history — never edit past files. Any agent: read this file and the newest sessions/ entries before starting.
 
-# Project State — updated 2026-09-24T18:30Z by opus (session 004)
+# Project State — updated 2026-09-26T12:00Z by opus (session 005)
 
 ## Goal
 Build the pull-based threshold price oracle for CKB specified in docs/oracle-design.md (final 2026-09-24, first version — nothing deployed before it): committees of permissioned publishers sign per-tick Merkle-batched price updates, a mirror API serves them, and projects forward-update their own Type ID-unique price_feed_type cells.
@@ -27,10 +27,8 @@ Build the pull-based threshold price oracle for CKB specified in docs/oracle-des
 Rust contracts and tests pass (price_feed_type, publisher_set_type, lean-oracle-common, vectors). SDK `lean-oracle-sdk` (packages/sdk): root, /protocol (all on-chain codecs + Observation + CommitteeConfig), /publisher (signing); 11 tests. Publisher `lean-oracle-publisher` (apps/publisher, private, Docker-only; operator config now `key` + `committee.configDir`): 16 tests incl. in-process committee scenarios (identical verifiable updates, down leader, lagging publisher sync, outlier refuses, double-sign guard, n=1); a real 4-process committee over WebSockets with mock sources finalized 8 ticks in ~9 s, verified by the SDK. Committee templates: apps/publisher/configs/{majors,ckb}.template.json. Docker image lean-oracle-publisher:dev builds (244 MB); a 4-container committee on a Docker network finalized and served updates that verify with the SDK, and a restarted container resynced from its persisted volume. Spec updated with the implemented formats (observation layout, canonical config JSON + signature list, integer EMA, lower medians, peer envelopes).
 
 ## Next
-Mirror API built (apps/mirror, SDK /mirror, pullAndUpdate; devnet e2e uses it). Remaining: mirror /v1/configs, testnet deployment, pools repo migration, GHCR images.
-Feeds are now native pairs with no conversion (see session 004, last block). Launch basket: majors BTC/ETH/SOL × /USD,/USDT,/USDC + USDT/USD; ckb CKB/USDT, CKB/USDC. USDC/USD pending a third venue.
-
-Build the mirror API (apps/mirror): add a public read-only finalized-update stream to publishers (WS) plus existing /v1/finalized?after= backfill; mirror verifies against the committee cell, dedupes and detects equivocation by header hash (not blob bytes — quorum subsets differ), stores in SQLite, serves Hermes-like endpoints; then SDK /mirror + pullAndUpdate and switch the devnet e2e to the mirror.
+Testnet is live (v2 contracts, one publisher, mirror at https://64-227-40-35.sslip.io, watchdog + backups on the droplet); lean-oracle-sdk 1.0.0 is on npm; the landing page (apps/web) is done with the 卜 logo. See sessions/004 and 005.
+Current work: documentation at /docs in apps/web. The structure proposal (Learn / Build / Reference / Operate tabs, Fumadocs) is awaiting the user's approval — see session 005, last block. Deferred by the user: multi-publisher onboarding (step 4), mainnet prep (step 5). The pools repo is out of scope.
 
 ## Notes
 - Build: `CC_riscv64imac_unknown_none_elf=riscv64-elf-gcc cargo build --release`; test: `cargo test --workspace --target aarch64-apple-darwin` (tests load the RISC-V binaries, so build first). Rust pinned to 1.92 (1.98 emits unsupported atomics).

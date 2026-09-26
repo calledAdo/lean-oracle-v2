@@ -17,8 +17,8 @@ const feed = (symbol: string, expo: number, committee: string): FeedInfo => ({ s
 export const FEEDS: readonly FeedInfo[] = [
   ...["BTC", "ETH", "SOL"].flatMap((base) => ["USD", "USDT", "USDC"].map((quote) => feed(`Crypto.${base}/${quote}`, -8, "majors"))),
   feed("Crypto.USDT/USD", -8, "majors"),
-  feed("Crypto.CKB/USDT", -10, "ckb"),
-  feed("Crypto.CKB/USDC", -10, "ckb"),
+  feed("Crypto.CKB/USDT", -10, "majors"),
+  feed("Crypto.CKB/USDC", -10, "majors"),
 ];
 
 export function feedBySymbol(symbol: string): FeedInfo | undefined {

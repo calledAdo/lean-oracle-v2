@@ -151,8 +151,8 @@ re-pin its type hash.
 
 ## Committee configs
 
-[`configs/majors.template.json`](configs/majors.template.json) and
-[`configs/ckb.template.json`](configs/ckb.template.json) hold the launch methodology. A committee
+[`configs/majors.template.json`](configs/majors.template.json) holds the launch methodology for
+every feed, the CKB pairs included (one committee). A committee
 config adds `version`, `publisherSetTypeHash`, `activationTickMs` and each feed's `feedId`. It
 needs signatures from a quorum of the current set before publishers accept it.
 

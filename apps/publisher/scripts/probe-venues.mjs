@@ -12,7 +12,7 @@ import { marketsByVenue } from "../dist/sources/runner.js";
 // Usage: probe-venues.mjs [seconds] [--doh]  (--doh resolves exchange hosts over DNS-over-HTTPS)
 const seconds = Number(process.argv[2] ?? 20);
 const doh = process.argv.includes("--doh");
-const templates = ["majors", "ckb"].map((n) => JSON.parse(readFileSync(new URL(`../configs/${n}.template.json`, import.meta.url), "utf8")));
+const templates = ["majors"].map((n) => JSON.parse(readFileSync(new URL(`../configs/${n}.template.json`, import.meta.url), "utf8")));
 const byVenue = marketsByVenue(templates.flatMap((t) => t.feeds));
 const counts = new Map();
 const sink = {

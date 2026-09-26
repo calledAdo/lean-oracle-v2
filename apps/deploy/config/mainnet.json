@@ -10,9 +10,6 @@
   "committees": {
     "majors": {
       "pubkeys": []
-    },
-    "ckb": {
-      "pubkeys": []
     }
   }
 }

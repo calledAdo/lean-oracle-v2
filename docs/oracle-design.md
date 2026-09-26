@@ -40,14 +40,16 @@ A **pull oracle** for any CKB project, modelled on Pyth + Hermes and on the on-c
 
 A committee is one PublisherSet cell (existing `publisher_set_type`, quorum
 `floor(2n/3)+1`) plus off-chain parameters that it publishes. Committees isolate risk, cadence
-and methodology from each other.
+and methodology from each other. Launch has one committee, `majors`; the CKB pairs moved into it
+(2026-09-26, D20) because they need no separate cadence (their methodology is per feed) and one
+committee means one set of keys to run and one tick for pairs a consumer combines.
 
-| | `majors` | `ckb` |
-|---|---|---|
-| Feeds (initial) | BTC, ETH, SOL each in /USD, /USDT and /USDC; USDT/USD | CKB/USDT, CKB/USDC |
-| Tick period | 1000 ms (500 ms possible later) | 2000 ms |
-| Venues | /USD: Coinbase, Kraken, Bitstamp. /USDT: Binance, OKX, Bybit, Gate, Bitget, KuCoin, MEXC. /USDC: Binance, OKX, Bybit, Kraken, Bitget, KuCoin, MEXC, Gate | /USDT: Binance, Gate, Bitget, KuCoin, MEXC. /USDC: Binance, Gate, MEXC |
-| Publishers | 1–9 (target 7) | 1–9 (target 4) |
+| | `majors` |
+|---|---|
+| Feeds (initial) | BTC, ETH, SOL each in /USD, /USDT and /USDC; USDT/USD; CKB/USDT, CKB/USDC |
+| Tick period | 1000 ms (500 ms possible later) |
+| Venues | /USD: Coinbase, Kraken, Bitstamp. /USDT: Binance, OKX, Bybit, Gate, Bitget, KuCoin, MEXC. /USDC: Binance, OKX, Bybit, Kraken, Bitget, KuCoin, MEXC, Gate. CKB/USDT: Binance, Gate, Bitget, KuCoin, MEXC. CKB/USDC: Binance, Gate, MEXC |
+| Publishers | 1–9 (target 7) |
 
 `feed_id = ckb_hash("LEAN/FEED/V1" || symbol)` with Pyth-style canonical symbols such as
 `Crypto.BTC/USDT`. **Every feed is a native pair:** it is priced only from markets that trade exactly
@@ -176,11 +178,11 @@ At tick `t` it computes one observation per feed.
      ms;
    - the first finalized price initializes it.
 
-Launch defaults are in `apps/publisher/configs/{majors,ckb}.template.json`:
+Launch defaults are in `apps/publisher/configs/majors.template.json` (settings are per feed):
 
-| Setting | `majors` | USDT/USD | `ckb` |
+| Setting | BTC, ETH, SOL | USDT/USD | CKB pairs |
 |---|---|---|---|
-| Tick / `observationDeadlineMs` | 1000 / 400 | 1000 / 400 | 2000 / 800 |
+| Tick / `observationDeadlineMs` | 1000 / 400 | 1000 / 400 | 1000 / 400 |
 | Venue price | `mid`, 1 s window | `mid`, 1 s window | 60 s `vwap`, else `mid` |
 | `maxQuoteAgeMs` (liveness) | 2 s | 2 s | 60 s |
 | `maxSpreadBps` | 50 | 10 | 300 |
@@ -191,8 +193,8 @@ Launch defaults are in `apps/publisher/configs/{majors,ckb}.template.json`:
 | EMA half-life | 1 h | 1 h | 1 h |
 
 No currency conversion happens anywhere in the pipeline. A consumer that needs another pair divides
-feeds itself, e.g. CKB/USD = CKB/USDT × USDT/USD (the two come from different committees, so the
-consumer chooses how close their timestamps must be). USDC/USD is not a launch feed: only Kraken and
+feeds itself, e.g. CKB/USD = CKB/USDT × USDT/USD (both come from the same committee, so the same tick
+carries both). USDC/USD is not a launch feed: only Kraken and
 Bitstamp trade it natively, one short of the rules above.
 
 ## 5. Off-chain signing protocol (one canonical update per tick)
@@ -445,7 +447,7 @@ bursts of 20, 2 streams per anonymous client. Unknown keys get 401, exhausted bu
 trust, only publisher URLs and the committee cell.
 
 Full history is retained. Measured on testnet: about 0.4 GB/day for a 10-feed committee at 1 s
-ticks in each publisher store, and about 0.8 GB/day in the mirror for two committees; plan disk or
+ticks in each publisher store, and about 0.8 GB/day in the mirror (measured with two committees before the CKB pairs joined majors); plan disk or
 retention accordingly. Not yet built: serving
 approved committee configs (`/v1/configs`).
 
@@ -526,12 +528,12 @@ new set. The devnet end-to-end test (`apps/deploy/tests`) exercises the whole pa
 | Model | Pull oracle; cells store the signed `publish_time_ms`; freshness and snapshots are the consumer's |
 | On-chain flow | Mirrors lean-oracle: zeroed creation, strictly forward updates, lock-controlled burn |
 | Batching | Merkle root per tick, blake2b sorted-pair nodes |
-| Tick period | 1000 ms `majors`, 2000 ms `ckb` (400–500 ms `majors` later) |
+| Tick period | 1000 ms (400–500 ms later) |
 | Quote and IDs | Native pairs only (/USD, /USDT, /USDC), no conversion by publishers; `feed_id = ckb_hash("LEAN/FEED/V1" \|\| symbol)`, permanent; fixed exponent (-8; CKB -10) |
 | Domain tags | `LEAN/` prefix everywhere |
 | Cells | No public cells; Type ID-unique `args = feed_id \|\| type_id`; any lock |
 | Code | Immutable, `data2`, no upgrade key; versioned deployments |
-| Launch basket | `majors`: BTC, ETH, SOL × /USD, /USDT, /USDC, plus USDT/USD; `ckb`: CKB/USDT, CKB/USDC |
+| Launch basket | `majors`: BTC, ETH, SOL × /USD, /USDT, /USDC, plus USDT/USD, CKB/USDT, CKB/USDC (one committee) |
 | Config | Quorum-signed versions with activation tick; `config_hash` in header |
 | Publishers | n ≤ 9 hard cap, no minimum; launch with available operators |
 | Methodology | Section 4: liveness-based freshness, 100 ms mid sampling, dust filter, outlier pass, native pairs without conversion, config rules (minVenues ≥ 2, one spare market, one market per venue), even-count median = floor mean of middle two; EMA from finalized history |

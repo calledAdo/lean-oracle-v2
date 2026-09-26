@@ -30,8 +30,8 @@ Each feed needs at least two exchanges to agree, so no single exchange can set a
 
 ## 3. Sign
 
-Publishers are grouped into **committees**: `majors` for BTC, ETH, SOL and USDT, and `ckb` for CKB
-pairs. A committee is defined by a cell on CKB that holds its publishers' public keys.
+Publishers are grouped into **committees**. Launch has one, `majors`, which signs every feed:
+BTC, ETH, SOL, USDT and the CKB pairs. A committee is defined by a cell on CKB that holds its publishers' public keys.
 
 Each tick, the committee puts every feed's price into one Merkle tree, and a **quorum** of publishers
 signs its root. The quorum is more than two thirds of the committee (`⌊2n/3⌋ + 1`). One set of

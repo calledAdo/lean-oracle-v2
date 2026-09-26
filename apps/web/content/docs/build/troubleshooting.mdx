@@ -1,0 +1,18 @@
+---
+title: Troubleshooting
+description: Common problems and what to do.
+---
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Transaction fails with script error 83 | The update is not newer than the cell's price | Fetch a newer update; someone else already moved the cell |
+| Error 89 | The update was signed by a different committee or an old key set | Check the committee; after a rotation, fetch a fresh update |
+| Error 90 | Not enough valid signatures | The update is not a quorum update; fetch it again from a mirror |
+| Error 85 | The committee cell dep is missing or wrong | Let the SDK build the transaction, or add the committee cell dep |
+| `insufficient` from `completeFee` | The signer lacks plain CKB | Fund it; `shortfall` says how much |
+| Mirror returns 429 | Rate limit | Wait for `Retry-After`, use an API key, or run a mirror |
+| A feed is in `missing` | No update for it yet at that time | Check the symbol; for `at`, the tick may be missing |
+| Your contract rejects the price as stale | Your freshness rule; the update predates the header dep | Fetch an update published after that block |
+
+`contractErrorName(code)` from `lean-oracle-sdk` turns a script error code into its name. All codes
+are listed in [Script error codes](/docs/reference/errors).

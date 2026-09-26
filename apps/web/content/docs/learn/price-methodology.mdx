@@ -1,0 +1,59 @@
+---
+title: How a price is made
+description: How each publisher turns exchange order books into one price, confidence and moving average.
+---
+
+Every publisher computes each feed independently, with the same rules and settings, once per tick.
+The committee then signs one result per feed. The settings are part of a versioned
+[committee config](/docs/operate/governance), and every signed update carries the hash of the config
+that produced it.
+
+## 1. Which exchanges count
+
+A feed lists the exchanges (venues) allowed to price it, and each must trade exactly that pair. At
+each tick, an exchange counts only if:
+
+- its connection delivered something recently (liveness, not price movement: a quiet market on a
+  live connection still counts);
+- its order book is not crossed and its spread is within a limit;
+- the best bid and ask each have real size behind them (the dust filter).
+
+## 2. One price per exchange
+
+For most feeds, the exchange's price is the median of its mid price, sampled every 100 ms through a
+one-second window. CKB pairs, which trade more thinly, use a 60-second trade VWAP where there were
+trades.
+
+## 3. One price per feed
+
+- Take the **median** across exchanges. For an even count, it is the floor of the mean of the middle
+  two.
+- Drop exchanges further than the allowed deviation from that median, and take the median again.
+- At least a minimum number of exchanges must remain, or the feed is skipped for that tick.
+- **Confidence** is the larger of the median half-spread and the median absolute deviation between
+  exchanges.
+- **Source time** is the median time of the exchange data used.
+
+## 4. Moving average
+
+`ema_price` and `ema_conf` use a one-hour half-life. They are computed from the committee's signed
+history in integer arithmetic, so every publisher gets the same value.
+
+## Launch settings
+
+| Setting | majors | USDT/USD | ckb |
+|---|---|---|---|
+| Tick | 1 s | 1 s | 2 s |
+| Exchange price | mid, 1 s | mid, 1 s | 60 s VWAP, else mid |
+| Liveness | 2 s | 2 s | 60 s |
+| Max spread | 0.5% | 0.1% | 3% |
+| Max deviation | 1% | 0.3% | 3% |
+| Minimum exchanges | /USD 2 of 3, /USDT 3 of 7, /USDC 3 of 8 | 2 of 3 | /USDT 3 of 5, /USDC 2 of 3 |
+
+## Rules every feed follows
+
+- **Native pairs only.** No currency is ever converted. USDC/USD is not offered because only two
+  exchanges trade it directly.
+- **At least two exchanges must agree**, so no single exchange can set a price.
+- **One spare market.** A feed lists at least one more market than it needs, so one exchange going
+  down does not stop it.

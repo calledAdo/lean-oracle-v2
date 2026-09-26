@@ -2,5 +2,5 @@
   "title": "Build",
   "description": "Put prices on chain and use them",
   "root": true,
-  "pages": ["quick-start", "tutorial", "responsibilities"]
+  "pages": ["quick-start", "tutorial", "---Guides---", "...guides", "---Before you ship---", "responsibilities", "troubleshooting"]
 }

@@ -1,0 +1,15 @@
+---
+title: Handle many users
+description: Avoid contention when many transactions need a price at once.
+---
+
+A cell can be consumed once per block. If every user's transaction updates the same feed cell, only
+one per block succeeds.
+
+- **Read, don't update, where you can.** Many transactions can use a feed cell as a cell dep in the
+  same block. Let a keeper update it, and let users only read it with your freshness rule.
+- **Several cells.** Create several feed cells for the same feed and let each user or shard use
+  its own. Your contract accepts any of a list of type hashes, or any cell with the right feed and
+  committee (then check the committee!).
+- **Verify in your script.** Put the update blob in your own transaction's witness and verify it
+  there; no feed cell is involved. See [Verify an update in your own script](/docs/build/guides/verify-in-script).

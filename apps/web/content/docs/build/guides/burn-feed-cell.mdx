@@ -1,0 +1,14 @@
+---
+title: Burn a feed cell
+description: Remove a feed cell you no longer need and get its CKB back.
+---
+
+```ts
+const tx = await oracle.burnFeedCell(typeScript);
+const fee = await oracle.completeFee(tx, signer);
+if (fee.status === "ok") await signer.sendTransaction(fee.tx);
+```
+
+The type script always allows a burn; the cell's lock decides who may. The capacity (about 280 CKB)
+goes back to you as change. Burned cells can never be recreated with the same identity, so update
+any contract that pinned it.

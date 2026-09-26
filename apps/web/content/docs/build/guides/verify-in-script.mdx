@@ -1,0 +1,27 @@
+---
+title: Verify an update in your own script
+description: Use a signed price directly, without a feed cell.
+---
+
+Instead of reading a feed cell, your script can verify the update blob itself. It suits settlement
+at an exact time and designs where many transactions need prices in parallel.
+
+```rust
+use lean_oracle_common::price_update::verify_price_update;
+use lean_oracle_common::publisher_set::PublisherSetData;
+
+// The committee cell as a cell dep, found by its type hash.
+let set = PublisherSetData::from_bytes(&committee_cell_data).ok_or(E)?;
+// The blob from your witness.
+let verified = verify_price_update(&blob, &feed_id, &committee_type_hash, &set).map_err(|_| E)?;
+
+let price = verified.message.price;
+let time = verified.header.publish_time_ms;
+```
+
+- **Cost.** About 8 million cycles per signature, versus 38,000 to read a feed cell.
+- **Replay.** Nothing stops the same update being used twice or an older one being chosen. Your
+  script must decide what is acceptable, for example `publish_time_ms == T` for settlement, or
+  newer than a time it stores.
+- **Current set only.** The committee cell dep holds the current keys; after a rotation, older
+  updates no longer verify.

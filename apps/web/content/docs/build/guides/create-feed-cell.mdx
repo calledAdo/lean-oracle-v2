@@ -1,0 +1,31 @@
+---
+title: Create a feed cell
+description: Create the cell your contract will read prices from.
+---
+
+```ts
+import { ccc } from "@ckb-ccc/core";
+import { LeanOracleTestnetClient } from "lean-oracle-sdk/client";
+
+const oracle = new LeanOracleTestnetClient();
+const signer = new ccc.SignerCkbPrivateKey(oracle.cccClient, privateKey);
+
+const { tx, typeScript } = await oracle.createFeedCell({
+  signer,
+  feed: "Crypto.BTC/USDT",
+  committee: "majors",
+  // lock: optional; defaults to the signer's lock
+});
+const fee = await oracle.completeFee(tx, signer);
+if (fee.status === "insufficient") throw new Error(`Needs ${fee.shortfall} more shannons`);
+await signer.sendTransaction(fee.tx);
+```
+
+- **Keep `typeScript`.** Its hash identifies your cell for good. Put the hash in your contract's args
+  or config.
+- **Choose the lock deliberately.** It decides who can update and burn the cell. Use `lock` to set a
+  multisig or a lock that lets keepers update it. See [Feed cells](/docs/learn/feed-cells).
+- **The feed and committee are fixed** for the cell's life. For another feed, create another cell.
+- **It starts empty.** The new cell has no price until its [first update](/docs/build/guides/update-feed-cell).
+
+To find cells you created earlier: `oracle.findFeedCells("Crypto.BTC/USDT", "majors")`.

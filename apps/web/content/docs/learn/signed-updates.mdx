@@ -1,0 +1,46 @@
+---
+title: Signed updates
+description: Ticks, Merkle batching and quorum signatures.
+---
+
+Once per tick, the committee produces one **update**: every feed's price, bound together and signed
+once.
+
+<MerkleTree />
+
+## Batching
+
+Each feed's price message is a leaf of a Merkle tree, ordered by feed ID. The update's header holds
+the tree's root. When you ask a mirror for some feeds, it returns a **blob** with the header, the
+signatures, and just those feeds with their proofs. A proof for one feed out of 12 is at most four hashes.
+
+## Signing
+
+A quorum of the committee, `⌊2n/3⌋ + 1` of its `n` publishers, signs the header. Publishers sign
+only a header they computed themselves or agree with within tolerance, and they never sign two
+different headers for the same tick; each keeps a local record that refuses it.
+
+The header contains:
+
+- the committee (its cell's type hash) and the set index, which changes on every key rotation;
+- the tick's time, `publish_time_ms`, which becomes each price's publish time;
+- the hash of the committee config that produced the prices;
+- the number of leaves and the Merkle root.
+
+## Checking an update
+
+An update is valid for a feed when:
+
+1. the feed's leaf and proof lead to the header's root;
+2. the header names the committee you expect, at its **current** set index;
+3. the committee is not paused;
+4. a quorum of that set's keys signed the header.
+
+The `price_feed_type` script does exactly this on chain, the SDK does it before building any
+transaction, and the mirror does it before storing an update. The byte layout is in
+[On-chain formats](/docs/reference/formats).
+
+## Only the current set
+
+After a key rotation, updates signed by the old set are no longer accepted, including old
+history. Keep this in mind if you plan to settle at a past time: apply the update before a rotation.

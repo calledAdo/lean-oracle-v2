@@ -1,0 +1,75 @@
+---
+title: Run your own mirror
+description: Serve signed updates yourself, with no rate limits and no trust in anyone else's mirror.
+---
+
+A mirror needs no trust: it verifies every update against the committee cell on CKB. Run one if you
+need higher request rates, your own history, or no dependence on the public mirror.
+
+<Callout type="info" title="Publisher access">
+  A mirror reads from the publishers' APIs, which are private today. Open an issue on GitHub to get
+  access for your mirror.
+</Callout>
+
+<Steps>
+<Step>
+### Build the image
+
+```bash
+git clone https://github.com/calledAdo/lean-oracle-v2 && cd lean-oracle-v2
+docker build -f apps/mirror/Dockerfile -t lean-oracle-mirror .
+```
+
+A prebuilt image is also published as `ghcr.io/calledado/lean-oracle-mirror`.
+</Step>
+<Step>
+### Configure
+
+Create `mirror-config/mirror.json`:
+
+```json
+{
+  "http": { "host": "0.0.0.0", "port": 7800, "trustProxy": false },
+  "dataPath": "/data/mirror.db",
+  "committees": [
+    {
+      "name": "majors",
+      "publisherSetTypeHash": "0x<committee type hash>",
+      "chain": {
+        "rpcUrl": "https://testnet.ckb.dev/rpc",
+        "typeScript": { "codeHash": "0x<publisher_set_type code hash>", "hashType": "data2", "args": "0x<type id>" }
+      },
+      "publishers": ["http://publisher-0:7701"]
+    }
+  ],
+  "rateLimit": { "anonymous": { "rps": 10, "burst": 20, "maxStreams": 2 } }
+}
+```
+
+Committee hashes and type scripts are in [Networks](/docs/reference/networks) and
+[`deployments/testnet.json`](https://github.com/calledAdo/lean-oracle-v2/blob/main/deployments/testnet.json).
+List several publishers per committee; any one is enough.
+</Step>
+<Step>
+### Run
+
+```bash
+docker run -d --name mirror -p 7800:7800 -v $PWD/mirror-config:/config:ro -v mirror-data:/data lean-oracle-mirror
+```
+
+Check `http://localhost:7800/health`. Put a reverse proxy in front for TLS; set `trustProxy` only
+behind one.
+</Step>
+<Step>
+### Point the SDK at it
+
+```ts
+const oracle = new LeanOracleTestnetClient({
+  overrides: { mirrorUrls: ["https://your-mirror.example", "https://64-227-40-35.sslip.io"] },
+});
+```
+</Step>
+</Steps>
+
+Storage grows by about 50 MB per committee per day. API keys with their own limits go under
+`rateLimit.keys`.

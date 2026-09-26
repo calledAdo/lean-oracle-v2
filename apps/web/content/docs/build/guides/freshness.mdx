@@ -1,0 +1,43 @@
+---
+title: Check freshness
+description: Make sure a price is recent enough, without a clock.
+---
+
+CKB scripts cannot read the current time, and the oracle never rejects an old price. Your contract
+must compare `publish_time_ms` with a time it can prove.
+
+## After your own cell was created
+
+The strongest pattern: the price must be published **after** the block that created the cell being
+spent. The script loads that block's header through a header dep, so the time is provable.
+
+```rust
+use lean_oracle_common::consumer::published_after;
+
+let header = load_header(0, Source::GroupInput)?;          // header dep of the input
+published_after(&feed, header.raw().timestamp().unpack())?; // strictly later
+```
+
+The transaction must include the input's block hash in `header_deps`.
+
+## Within a window of a recent block
+
+To require a price no older than, say, 60 seconds, compare it with a recent block the transaction
+includes as a header dep:
+
+```rust
+let block_ms: u64 = load_header(0, Source::HeaderDep)?.raw().timestamp().unpack();
+if feed.publish_time_ms + 60_000 < block_ms { return Err(ERROR_STALE); }
+```
+
+This proves the price is at most 60 seconds older than that block. Combine it with a check that the
+block itself is recent, for example by using `since` on an input.
+
+## Use your own state
+
+A contract can store the last price time it accepted and require each new one to be later.
+Together with the feed cell's forward-only rule, no price can ever be reused.
+
+## Note
+
+A block's timestamp is set by its miner within consensus limits, so allow some seconds of slack.

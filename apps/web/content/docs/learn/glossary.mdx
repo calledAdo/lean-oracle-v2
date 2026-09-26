@@ -1,0 +1,25 @@
+---
+title: Glossary
+description: Terms used across these docs.
+---
+
+| Term | Meaning |
+|---|---|
+| **Blob** | A signed update restricted to some feeds, with their proofs. Goes in the witness. |
+| **Committee** | A group of publishers that signs a basket of feeds, defined by a committee cell. |
+| **Committee cell** | The `publisher_set_type` cell holding a committee's public keys and set index. |
+| **Confidence** (`conf`) | How far exchanges disagreed, at the price's exponent. |
+| **EMA** | One-hour exponential moving average of the price and confidence. |
+| **Exponent** (`expo`) | Scale of a price: value = price × 10^expo. |
+| **Feed** | One native pair, such as `Crypto.BTC/USDT`. |
+| **Feed cell** | Your cell holding the last verified price of a feed. |
+| **Feed ID** | `ckb_hash("LEAN/FEED/V1" ‖ symbol)`. Permanent. |
+| **Mirror** | A service that collects, verifies and serves signed updates. Untrusted. |
+| **Native pair** | A feed priced only from markets trading exactly that pair. |
+| **Publish time** | The tick's time, signed by the committee (`publish_time_ms`). |
+| **Publisher** | An operator that observes exchanges and signs updates. |
+| **Pull oracle** | An oracle whose prices are brought on chain by the transactions that use them. |
+| **Quorum** | `⌊2n/3⌋ + 1` of a committee's `n` publishers. |
+| **Set index** | Number of the committee's current key set; changes on rotation. |
+| **Tick** | One signing round: 1 s for majors, 2 s for CKB. |
+| **Type ID** | A CKB pattern making a cell's type hash unique; it identifies your feed cell. |

@@ -1,0 +1,35 @@
+---
+title: Update a feed cell
+description: Move your feed cell forward to a newer signed price.
+---
+
+```ts
+const update = await oracle.pullAndUpdate(typeScript);
+const fee = await oracle.completeFee(update.tx, signer);
+if (fee.status === "ok") await signer.sendTransaction(fee.tx);
+
+console.log(update.before.price, "→", update.after.price);
+```
+
+`pullAndUpdate` fetches the latest update from the mirror, verifies it against the live committee
+cell, and builds the transaction. It never builds a transaction the chain would reject.
+
+## What the transaction contains
+
+<TxAnatomy />
+
+## Updating in the same transaction that uses the price
+
+Usually you want the price and its use in one transaction, so nothing can happen in between: take
+`update.tx`, add your own inputs, outputs and cell deps, then complete the fee. Your contract reads
+the **output** feed cell in that case, not a cell dep.
+
+## If you already have an update
+
+Use `oracle.updateFeedCell(typeScript, blob)` with a blob from the Mirror API or your own mirror.
+
+## Common failures
+
+- **Not newer.** Another transaction already moved the cell to this or a later tick. Fetch again.
+- **Cell already spent.** The cell changed since you built the transaction. Rebuild it.
+- **Insufficient capacity.** `completeFee` returns the shortfall in shannons.

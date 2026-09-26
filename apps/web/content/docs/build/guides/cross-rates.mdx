@@ -1,0 +1,26 @@
+---
+title: Derive cross rates
+description: Combine native feeds into the pair you need.
+---
+
+Feeds are never converted. For a pair that isn't listed, combine feeds yourself:
+
+- BTC/USD from BTC/USDT and USDT/USD: `BTC/USDT × USDT/USD`
+- CKB/USD: `CKB/USDT × USDT/USD`
+- ETH/BTC: `ETH/USDT ÷ BTC/USDT`
+
+## In a contract
+
+Read both feed cells, rescale to a common exponent, multiply or divide with 128-bit intermediates:
+
+```rust
+let ckb = price_at_expo(&ckb_usdt, -10).ok_or(E)? as i128; // CKB/USDT at 1e-10
+let usdt = price_at_expo(&usdt_usd, -8).ok_or(E)? as i128; // USDT/USD at 1e-8
+let ckb_usd = ckb * usdt / 100_000_000;                     // CKB/USD at 1e-10
+```
+
+## Decide how close the times must be
+
+The two feeds may come from different committees and ticks (CKB pairs tick every two seconds). Check
+that their `publish_time_ms` are within a bound you accept, and combine confidences conservatively:
+for a product, relative confidences roughly add.

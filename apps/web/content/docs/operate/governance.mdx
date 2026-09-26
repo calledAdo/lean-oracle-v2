@@ -1,0 +1,32 @@
+---
+title: Committee governance
+description: How committees change their settings and keys.
+---
+
+## Settings: the committee config
+
+Everything except the keys lives in a versioned **committee config**: the feed list with IDs and
+exponents, each feed's exchanges and minimum count, the methodology settings, and the tick timing.
+
+1. Someone proposes a new version with an **activation tick**.
+2. Each publisher reviews it and signs its hash. The config file collects the signatures.
+3. With a quorum of signatures it is approved.
+4. All publishers switch at the activation tick. Every signed update carries the active config's
+   hash.
+
+No transaction is needed. Adding a feed adds a leaf; removing one stops including it. Feed IDs are
+never reused.
+
+The tooling refuses configs that break the feed rules: a native pair on every listed market, at least
+two exchanges required, one spare market, and each exchange at most once.
+
+## Keys: rotating the committee cell
+
+Publishers are added, removed or replaced by rotating the committee cell:
+
+- the rotation is signed by a quorum of the current set;
+- every new key proves it is held (proof of possession);
+- the set index increases, and only the new set's updates are accepted from then on.
+
+Committee cells can't be destroyed, only rotated. A committee can also be paused, which stops all
+updates until it is resumed.

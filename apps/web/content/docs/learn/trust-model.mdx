@@ -1,0 +1,43 @@
+---
+title: Trust model
+description: What you trust, what you don't, and what the oracle leaves to you.
+---
+
+## You trust the committee
+
+A price is accepted when a quorum of the committee's current publishers signed it. You trust that
+fewer than a quorum of publishers will collude or be compromised at once. Publishers are
+permissioned and named in the committee cell.
+
+<Callout type="warn" title="Testnet">
+  The testnet committees currently have one publisher, so testnet prices rest on a single key.
+</Callout>
+
+## You don't trust the transport
+
+| Party | Can | Cannot |
+|---|---|---|
+| Mirror, CDN, cache | Delay or withhold updates | Forge or change a price |
+| Whoever sends your update transaction | Choose which signed update to apply | Apply an older price than the cell holds, or a forged one |
+| Anyone creating feed cells | Create a cell anchored to their own committee | Make your contract accept it, if it checks the committee |
+
+## Changing the committee
+
+Keys change only through a rotation of the committee cell, authorized by a quorum of the current
+set, with proof that the new keys are held. After a rotation, only the new set's updates are
+accepted. A committee can also be paused, which stops all updates.
+
+## What the oracle leaves to you
+
+- **Freshness.** Scripts cannot read the clock, and the oracle never rejects old prices. Your contract
+  compares the publish time with a time it can prove.
+- **When to update.** Nobody updates your feed cell but you (or whoever your lock allows).
+- **Snapshots and settlement rules.** For example, which tick settles a market.
+- **Cross rates and bounds.** How to combine feeds, and what confidence or deviation to accept.
+
+See [Your responsibilities](/docs/build/responsibilities).
+
+## The code
+
+The contracts are immutable (`data2`, no upgrade key) and built reproducibly: anyone can rebuild them
+and compare the code hashes with [Networks](/docs/reference/networks).

@@ -1,0 +1,43 @@
+---
+title: Script error codes
+description: Error codes returned by price_feed_type and publisher_set_type.
+---
+
+`contractErrorName(code)` in `lean-oracle-sdk` returns the name for a code.
+
+## Feed cells (`price_feed_type`)
+
+| Code | Name | Meaning |
+|---|---|---|
+| 80 | FEED_DATA_MALFORMED | Cell data is not a 125-byte feed cell |
+| 81 | FEED_ID_MISMATCH | Feed ID differs from the type args, or feed/committee changed |
+| 82 | FEED_CREATION_NONZERO | A new cell must have all price fields zero |
+| 83 | FEED_NOT_FORWARD | The new publish time is not later than the stored one |
+| 84 | FEED_WITNESS_MALFORMED | Missing or malformed update witness |
+| 85 | FEED_SET_DEP | Committee cell dep missing, duplicated or invalid |
+| 86 | UPDATE_MALFORMED | The update blob does not decode |
+| 87 | UPDATE_FEED_NOT_FOUND | The blob has no entry (or two) for this feed |
+| 88 | UPDATE_PROOF | The Merkle proof does not match the root |
+| 89 | UPDATE_SET | Wrong committee, old set index, or paused committee |
+| 90 | UPDATE_SIGNATURE | Not enough valid signatures from the current set |
+| 91 | UPDATE_MISMATCH | The output data does not equal the verified price |
+
+## Committee cells (`publisher_set_type`)
+
+| Code | Name | Meaning |
+|---|---|---|
+| 60 | PUBLISHER_SET_MALFORMED | Invalid committee data |
+| 61 | PUBLISHER_SET_CONTINUITY | Rotation breaks the set index or history |
+| 62 | PUBLISHER_SET_AUTH | Rotation not authorized by a quorum of the current set |
+| 63 | PUBLISHER_SET_POP | Missing proof that new keys are held |
+| 64 | PUBLISHER_SET_OPERATION | Unknown or invalid operation |
+
+## Common
+
+| Code | Name | Meaning |
+|---|---|---|
+| -1 | ENCODING | Malformed molecule data |
+| -2 | SYSCALL | A syscall failed |
+| 11 | INVALID_SCRIPT_GROUP | Not a create, update or burn shape |
+| 12 | CONFIG_MUTATED | Immutable fields changed |
+| 14 | TYPE_ID_INVALID | Type ID args do not match the creating input |

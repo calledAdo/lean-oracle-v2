@@ -1,0 +1,22 @@
+---
+title: Status
+description: Check that committees are signing and the mirror is current.
+---
+
+The public mirror reports each committee's latest tick and connected publishers:
+
+```bash
+curl https://64-227-40-35.sslip.io/health
+```
+
+```json
+{
+  "committees": [
+    { "name": "majors", "ready": true, "latestTickMs": "1790384684000", "sourcesConnected": 1, "sources": 1 },
+    { "name": "ckb", "ready": true, "latestTickMs": "1790384684000", "sourcesConnected": 1, "sources": 1 }
+  ]
+}
+```
+
+A healthy committee's `latestTickMs` is within a few seconds of now. The testnet deployment is also
+watched by an alerting service that reports stalls, mirror problems and any equivocation.

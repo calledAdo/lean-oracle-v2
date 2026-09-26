@@ -10,6 +10,8 @@ import { PushPull } from "@/components/docs/push-pull";
 import { Pipeline } from "@/components/docs/pipeline";
 import { CellLifecycle } from "@/components/docs/cell-lifecycle";
 import { MirrorTry } from "@/components/docs/mirror-try";
+import { MerkleTree } from "@/components/docs/merkle-tree";
+import { TxAnatomy } from "@/components/docs/tx-anatomy";
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -27,6 +29,8 @@ export function getMDXComponents(components?: MDXComponents) {
     Pipeline,
     CellLifecycle,
     MirrorTry,
+    MerkleTree,
+    TxAnatomy,
     ...components,
   } satisfies MDXComponents;
 }

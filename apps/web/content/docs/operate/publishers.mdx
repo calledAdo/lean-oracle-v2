@@ -1,0 +1,30 @@
+---
+title: Becoming a publisher
+description: Who signs Lean Oracle prices, and how that will grow.
+---
+
+<Callout title="Coming later">
+  The testnet committees currently run with a single publisher. Onboarding more independent
+  publishers is the next step before mainnet.
+</Callout>
+
+## What a publisher does
+
+A publisher runs the publisher service (a Docker image), which:
+
+- keeps live connections to every exchange its committees use;
+- computes each feed's price every tick with the committee's rules;
+- exchanges observations and signatures with the other publishers;
+- signs one header per tick, never two, and serves finalized updates to mirrors.
+
+## What it takes
+
+- A reliable server with good connectivity to the exchanges.
+- Secure key storage; the service supports a key file or AWS KMS.
+- Monitoring and on-call attention, since a missing publisher weakens the quorum.
+- Checking each exchange's market-data terms.
+
+Committees hold up to nine publishers; the target is seven for `majors` and four for `ckb`.
+
+If you are interested, open an issue on
+[GitHub](https://github.com/calledAdo/lean-oracle-v2).

@@ -1,0 +1,30 @@
+---
+title: The mirror
+description: Where signed updates are collected, checked and served.
+---
+
+Publishers run on a private network. A **mirror** is the public service between them and
+applications, much like Pyth's Hermes.
+
+## What it does
+
+- **Collects** every finalized update from several publishers of each committee, over a live stream,
+  with a backfill on start, on reconnect and every minute.
+- **Verifies** each update before storing it: committee, set index, quorum signatures and every
+  Merkle proof. It re-reads the committee cell from CKB every 30 seconds.
+- **Keeps full history**, about 50 MB per committee per day at one-second ticks.
+- **Serves** the [Mirror API](/docs/reference/mirror-api) over HTTP and WebSocket, with rate limits.
+
+## Why you don't have to trust it
+
+Every update carries its own signatures. A mirror can be slow, down, or out of date, but it cannot
+make your contract accept a price the committee didn't sign. The SDK verifies everything it gets, and
+the chain verifies again.
+
+For redundancy, give the SDK several mirror URLs; it tries them in order.
+
+## Equivocation
+
+If two different valid headers ever appear for the same committee and tick, the mirror keeps the
+first as canonical, stores both, and serves them at `/v1/equivocations` as evidence. Publishers
+refuse to sign twice, so this should never happen.

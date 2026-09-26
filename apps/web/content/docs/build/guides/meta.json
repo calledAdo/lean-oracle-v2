@@ -1,0 +1,4 @@
+{
+  "title": "Guides",
+  "pages": ["create-feed-cell", "update-feed-cell", "read-in-contract", "freshness", "exact-time", "cross-rates", "many-users", "verify-in-script", "stream-prices", "burn-feed-cell"]
+}

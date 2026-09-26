@@ -1,0 +1,22 @@
+---
+title: Stream prices off-chain
+description: Receive every signed update as it happens.
+---
+
+```ts
+import { MirrorClient } from "lean-oracle-sdk/mirror";
+
+const mirror = new MirrorClient({ urls: ["https://64-227-40-35.sslip.io"] });
+const stream = mirror.stream(["Crypto.BTC/USDT", "Crypto.ETH/USDT"], (update) => {
+  for (const p of update.prices) console.log(p.feedId, p.price, p.expo, update.publishTimeMs);
+}, { onError: console.error });
+
+// later
+stream.close();
+```
+
+- Works in browsers and Node 20+ (pass a `WebSocket` constructor on older Node).
+- Anonymous clients may hold two streams at once.
+- Values are decoded from the signed blob. Pass `committees` to the `MirrorClient` to verify
+  signatures too.
+- For display only, polling `latest` every second or two is often simpler.

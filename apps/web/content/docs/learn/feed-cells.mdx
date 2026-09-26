@@ -1,0 +1,45 @@
+---
+title: Feed cells
+description: The cell that holds your verified price.
+---
+
+A **feed cell** holds the last verified price of one feed. You create it, you choose its lock, and
+you move it forward with signed updates. There are no public or shared feed cells.
+
+<CellLifecycle />
+
+## Identity
+
+The type script is `price_feed_type` with `args = feed_id || type_id` (64 bytes). The Type ID is
+derived from the creating transaction's first input, so no two cells can share a type hash, and a
+burned cell's identity can never be recreated. Your contract pins exactly one cell by its type hash.
+
+## Create, update, burn
+
+| Action | Rules |
+|---|---|
+| Create (none → one) | The data holds the feed ID and committee, and every price field is zero. The committee cell must be a cell dep. |
+| Update (one → one) | Feed and committee unchanged; the witness update verifies for this feed; the new data equals the signed price exactly; the publish time is strictly newer. |
+| Burn (one → none) | Always allowed by the type script. The lock decides. |
+
+## The lock is yours
+
+Any lock works:
+
+- a normal signature lock, so only you can update the cell;
+- a multisig, for a team;
+- a lock of your own design that lets anyone update it, since the type script guarantees every
+  update is authentic and forward-only whoever sends it.
+
+## Cost
+
+- **Storage:** about 280 CKB per cell, returned when you burn it.
+- **Updating:** about 8 million cycles per signature checked, so roughly 24 million cycles with a
+  3-of-4 committee. Updating several feeds in one transaction checks the signatures once per cell.
+- **Reading:** about 38,000 cycles with the consumer helpers.
+
+## Many users
+
+A cell can be consumed once per block. If many transactions need a price at the same time, create
+several feed cells for the same feed, or [verify the update inside your own
+script](/docs/build/guides/verify-in-script).

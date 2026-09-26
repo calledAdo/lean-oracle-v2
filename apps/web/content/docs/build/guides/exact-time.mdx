@@ -1,0 +1,28 @@
+---
+title: Use the price at an exact time
+description: Settle at a known tick, such as the close of a market.
+---
+
+Every tick has a fixed time (a whole second for majors, an even second for CKB), and the mirror keeps
+all of them. To settle at time `T`:
+
+```ts
+const T = 1790384700000n; // ms, on a tick boundary
+const update = await oracle.pullAndUpdate(typeScript, { atMs: T, exact: true });
+```
+
+With `exact: true` the SDK uses the update published exactly at `T`, and fails if there is none.
+Without it, it uses the first update at or after `T`.
+
+Your contract then requires `publish_time_ms == T` on the output feed cell, in the same transaction
+that settles.
+
+## Things to plan for
+
+- **The feed cell must not have moved past `T`.** It only moves forward. Use a cell dedicated to
+  settlement, or [verify the update in your own script](/docs/build/guides/verify-in-script).
+- **A tick can be missing.** If too few exchanges were healthy, that tick has no price for the feed.
+  Decide on a fallback, such as the first tick after `T` or a void outcome.
+- **Settle before a key rotation.** Old updates stop verifying once the committee rotates.
+- **Querying directly:** `GET /v1/updates/at?t=T&ids=...` returns the same update, cached as
+  immutable.

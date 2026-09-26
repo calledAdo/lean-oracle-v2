@@ -1,0 +1,23 @@
+---
+title: Changelog
+description: Releases of the SDK and deployments.
+---
+
+## lean-oracle-sdk 1.0.0 · testnet v2
+
+- First stable SDK release. Replaces the Pyth-based 0.x, which is deprecated and incompatible.
+- Testnet runs reproducible contracts (v2) with committees `majors` and `ckb` and a public mirror.
+- Mainnet is not deployed; `LeanOracleMainnetClient` throws until it is.
+- Reference consumer: `examples/price_trigger_lock`.
+
+## 1.0.0-beta.1
+
+- Testnet preset moved to the v2 deployment. v1 contracts were retired; cells created under v1 no
+  longer move. Create new ones.
+
+## 1.0.0-beta.0
+
+- First release of the committee oracle: signed, Merkle-batched updates, `LeanOracleClient`,
+  `MirrorClient`, transaction builders and fee completion.
+
+Full history: [CHANGELOG.md](https://github.com/calledAdo/lean-oracle-v2/blob/main/packages/sdk/CHANGELOG.md).

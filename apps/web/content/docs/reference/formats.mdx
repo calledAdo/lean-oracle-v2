@@ -1,0 +1,83 @@
+---
+title: On-chain formats
+description: Byte layouts of updates, price messages, witnesses and feed cells.
+---
+
+All integers are little endian. Hashes are `ckb_hash` (blake2b-256 with the `ckb-default-hash`
+personalization). Every hashed or signed structure is prefixed with a domain tag such as
+`LEAN/PRICE_UPDATE/V1`.
+
+## Update blob
+
+What the mirror serves and what goes in the witness:
+
+```
+header (119) | signatures | entry_count u8 | entry_count × { leaf (86) | proof_len u8 | proof_len × [u8; 32] }
+```
+
+Signatures: `count u8 | count × { publisher_index u8 | signature [u8; 65] }`, recoverable low-S
+secp256k1, with strictly increasing publisher indexes.
+
+## Header (119 bytes, signed)
+
+| Offset | Field | Type |
+|---|---|---|
+| 0 | magic `"TPOU"` | [u8; 4] |
+| 4 | version = 1 | u8 |
+| 5 | publisher_set_type_hash (committee) | [u8; 32] |
+| 37 | set_index | u32 |
+| 41 | publish_time_ms (the tick) | u64 |
+| 49 | tick_period_ms | u32 |
+| 53 | config_hash | [u8; 32] |
+| 85 | leaf_count | u16 |
+| 87 | merkle_root | [u8; 32] |
+
+`signing_hash = ckb_hash("LEAN/PRICE_UPDATE/V1" || header)`.
+
+## Price message (leaf, 86 bytes)
+
+| Offset | Field | Type |
+|---|---|---|
+| 0 | message_type = 0 | u8 |
+| 1 | feed_id | [u8; 32] |
+| 33 | price | i64 |
+| 41 | conf | u64 |
+| 49 | expo | i32 |
+| 53 | prev_publish_time_ms | u64 |
+| 61 | ema_price | i64 |
+| 69 | ema_conf | u64 |
+| 77 | source_time_ms | u64 |
+| 85 | num_publishers | u8 |
+
+## Merkle tree
+
+- `leaf_hash = ckb_hash("LEAN/PRICE_LEAF/V1" || leaf)`
+- `node_hash = ckb_hash("LEAN/PRICE_NODE/V1" || min(a, b) || max(a, b))`; sorted pairs, so a proof
+  needs no left/right bits.
+- Leaves are ordered by ascending feed ID; an odd node is promoted unchanged.
+
+## Feed ID
+
+`feed_id = ckb_hash("LEAN/FEED/V1" || symbol)`, for example of `Crypto.BTC/USDT`.
+
+## Witness
+
+In `WitnessArgs.input_type` of the feed cell's input: `update_len u32 | update blob`.
+
+## Feed cell
+
+Type script `price_feed_type`, `args = feed_id || type_id` (64 bytes). Data (125 bytes):
+
+| Offset | Field | Type |
+|---|---|---|
+| 0 | feed_id | [u8; 32] |
+| 32 | publisher_set_type_hash | [u8; 32] |
+| 64 | price | i64 |
+| 72 | conf | u64 |
+| 80 | expo | i32 |
+| 84 | publish_time_ms | u64 |
+| 92 | prev_publish_time_ms | u64 |
+| 100 | ema_price | i64 |
+| 108 | ema_conf | u64 |
+| 116 | source_time_ms | u64 |
+| 124 | num_publishers | u8 |

@@ -1,0 +1,6 @@
+{
+  "title": "Operate",
+  "description": "Mirrors, committees and publishers",
+  "root": true,
+  "pages": ["index", "governance", "publishers", "status"]
+}

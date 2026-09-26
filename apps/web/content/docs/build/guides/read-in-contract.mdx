@@ -1,0 +1,36 @@
+---
+title: Read a price in your contract
+description: Find, check and use a feed cell in a CKB script.
+---
+
+Add [`lean-oracle-common`](/docs/reference/rust) to your script, then:
+
+```rust
+use ckb_std::{ckb_constants::Source, high_level::{load_cell_data, load_cell_type_hash, QueryIter}};
+use lean_oracle_common::consumer::{check_feed_cell, price_at_expo};
+
+fn read_price(feed_type_hash: [u8; 32], feed_id: [u8; 32], committee: [u8; 32]) -> Result<i64, i8> {
+    // Find the pinned feed cell among the cell deps.
+    let index = QueryIter::new(load_cell_type_hash, Source::CellDep)
+        .position(|hash| hash == Some(feed_type_hash))
+        .ok_or(ERROR_FEED_MISSING)?;
+    let data = load_cell_data(index, Source::CellDep).map_err(|_| ERROR_FEED_MISSING)?;
+
+    // Right feed, right committee, and a verified price.
+    let feed = check_feed_cell(&data, &feed_id, &committee).map_err(|_| ERROR_FEED_INVALID)?;
+
+    // Your freshness rule goes here; see "Check freshness".
+
+    // In the units you want, e.g. cents.
+    price_at_expo(&feed, -2).ok_or(ERROR_PRICE_SCALE)
+}
+```
+
+- Get the three hashes from your own configuration: the feed cell's type hash (from
+  [creating it](/docs/build/guides/create-feed-cell)), the feed ID from
+  [Price feeds](/docs/reference/feeds), and the committee type hash from
+  [Networks](/docs/reference/networks).
+- If the feed cell is updated in the same transaction, read it from `Source::Output` instead.
+- `feed` also has `conf`, `ema_price`, `publish_time_ms` and `num_publishers`.
+
+The [tutorial](/docs/build/tutorial) shows a complete script.

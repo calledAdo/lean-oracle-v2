@@ -1,9 +1,9 @@
 # Changelog
 
-## 2.0.0 (unreleased)
+## 2.0.0 (2026-09-26)
 
-Contract freeze formats (docs/designs/v1-contract-freeze.md). Not compatible with 1.x or with the
-current testnet deployment until it is redeployed.
+Contract freeze formats (docs/designs/v1-contract-freeze.md). Not compatible with 1.x; matches the
+testnet v3 deployment (one `majors` committee, CKB pairs included).
 
 - Committee cell v2: `minRotationIntervalS`, optional `previous` set with `untilMs`; operations
   `OP_ROTATE`, `OP_ROTATE_REVOKE`, `OP_PAUSE`, `OP_UNPAUSE`, `OP_REVOKE_PREVIOUS`; `transitionError`.

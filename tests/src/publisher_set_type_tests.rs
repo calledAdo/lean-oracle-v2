@@ -6,7 +6,7 @@ use ckb_testtool::{
     ckb_error::Error,
     ckb_types::{
         bytes::Bytes,
-        core::{ScriptHashType, TransactionBuilder, TransactionView},
+        core::{HeaderBuilder, ScriptHashType, TransactionBuilder, TransactionView},
         packed::{CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs},
         prelude::*,
     },
@@ -16,7 +16,8 @@ use lean_oracle_common::{
     errors::*,
     protocol_hash::type_id_seed,
     publisher_set::{
-        PreviousSet, PublisherSetData, GOVERNANCE_PAUSED, OP_PAUSE, OP_REVOKE_PREVIOUS, OP_ROTATE, OP_ROTATE_REVOKE, OP_UNPAUSE,
+        PreviousSet, PublisherSetData, GOVERNANCE_PAUSED, MAX_UNTIL_AHEAD_MS, OP_PAUSE, OP_REVOKE_PREVIOUS, OP_ROTATE, OP_ROTATE_REVOKE,
+        OP_UNPAUSE,
     },
     signatures::SignatureBundle,
 };
@@ -26,6 +27,8 @@ use crate::fixtures::Committee;
 const MAX_CYCLES: u64 = 500_000_000;
 const CAPACITY: u64 = 1_000_00000000;
 const DAY: u64 = 86_400;
+/// Timestamp of the header dep attached to governance transactions ("now" as the chain proves it).
+const NOW_MS: u64 = 1_700_000_000_000;
 /// Relative (bit 63) timestamp (bits 61-62 = 0b10) `since`, in seconds.
 const fn relative_seconds(seconds: u64) -> u64 {
     0xC000_0000_0000_0000 | seconds
@@ -78,8 +81,20 @@ impl Env {
         self.context.complete_tx(tx)
     }
 
-    /// Spend a live committee cell holding `old` into `outputs`, with `since` and `witness`.
+    /// Spend a live committee cell holding `old` into `outputs`, with `since`, `witness` and a header dep
+    /// at `NOW_MS`.
     fn op_tx(&mut self, old: &PublisherSetData, outputs: Vec<(CellOutput, PublisherSetData)>, since: u64, witness: Vec<u8>) -> TransactionView {
+        self.op_tx_with_header(old, outputs, since, witness, Some(NOW_MS))
+    }
+
+    fn op_tx_with_header(
+        &mut self,
+        old: &PublisherSetData,
+        outputs: Vec<(CellOutput, PublisherSetData)>,
+        since: u64,
+        witness: Vec<u8>,
+        header_ms: Option<u64>,
+    ) -> TransactionView {
         let cell = self.context.create_cell(
             CellOutput::new_builder().capacity(CAPACITY).lock(self.lock.clone()).type_(Some(self.committee_type.clone()).pack()).build(),
             Bytes::from(old.to_bytes()),
@@ -89,6 +104,11 @@ impl Env {
             .cell_deps(self.deps())
             .input(CellInput::new_builder().previous_output(cell).since(since).build())
             .witness(witness.as_bytes().pack());
+        if let Some(ms) = header_ms {
+            let header = HeaderBuilder::default().timestamp(ms).number(0u64).compact_target(0x1e083126u32).build();
+            self.context.insert_header(header.clone());
+            tx = tx.header_dep(header.hash());
+        }
         for (output, data) in outputs {
             tx = tx.output(output).output_data(Bytes::from(data.to_bytes()).pack());
         }
@@ -125,7 +145,7 @@ fn rotation() -> (Committee, Committee, PublisherSetData) {
     let next = PublisherSetData {
         governance_nonce: 1,
         current: next_keys.data.current.clone(),
-        previous: Some(PreviousSet { set: old.data.current.clone(), until_ms: 1_700_000_000_000 }),
+        previous: Some(PreviousSet { set: old.data.current.clone(), until_ms: NOW_MS }),
         ..old.data.clone()
     };
     (old, next_keys, next)
@@ -184,6 +204,35 @@ fn routine_rotation_needs_quorum_pop_and_the_interval() {
     // Proof of possession absent.
     let tx = env.op_tx(&old.data, vec![(env.output(CAPACITY), next.clone())], relative_seconds(DAY), witness(OP_ROTATE, &auth, None));
     assert_code(env.verify(&tx), ERROR_ENCODING);
+}
+
+#[test]
+fn routine_rotation_bounds_the_old_sets_window_by_a_header_dep() {
+    let mut env = Env::new();
+    let (old, next_keys, _) = rotation();
+    let h = env.committee_hash;
+    let with_until = |until_ms: u64| PublisherSetData {
+        governance_nonce: 1,
+        current: next_keys.data.current.clone(),
+        previous: Some(PreviousSet { set: old.data.current.clone(), until_ms }),
+        ..old.data.clone()
+    };
+    let signed = |next: &PublisherSetData| {
+        let auth = old.sign(&old.data.update_hash(&h, next, OP_ROTATE), &old.quorum_indexes());
+        let pop = next_keys.sign(&next.pop_hash(&h), &all(4));
+        witness(OP_ROTATE, &auth, Some(&pop))
+    };
+    // Up to an hour past the newest header dep is accepted.
+    let edge = with_until(NOW_MS + MAX_UNTIL_AHEAD_MS);
+    let tx = env.op_tx(&old.data, vec![(env.output(CAPACITY), edge.clone())], relative_seconds(DAY), signed(&edge));
+    env.verify(&tx).expect("switch tick within the bound");
+    // Beyond it, or without any header dep, the rotation is refused.
+    let far = with_until(NOW_MS + MAX_UNTIL_AHEAD_MS + 1);
+    let tx = env.op_tx(&old.data, vec![(env.output(CAPACITY), far.clone())], relative_seconds(DAY), signed(&far));
+    assert_code(env.verify(&tx), ERROR_PUBLISHER_SET_UNTIL);
+    let ok = with_until(NOW_MS);
+    let tx = env.op_tx_with_header(&old.data, vec![(env.output(CAPACITY), ok.clone())], relative_seconds(DAY), signed(&ok), None);
+    assert_code(env.verify(&tx), ERROR_PUBLISHER_SET_UNTIL);
 }
 
 #[test]

@@ -15,6 +15,12 @@ import type { Hex, Script } from "../types.js";
 import { occupiedCapacity } from "./cellCapacity.js";
 import { cellDep, concatBytes, plainInputOf, setInputType, u32le } from "./common.js";
 
+/**
+ * Most feed cells moved in one transaction by `updateFeedCells`. Measured at 7-of-9: 52.6M cycles for
+ * one feed, 58.4M for 24 (about 0.25M per extra feed), so 32 stays well inside one transaction.
+ */
+export const MAX_FEEDS_PER_TX = 32;
+
 /** Feed cell witness: `update_len u32 LE || update blob`, in `input_type`. */
 export function encodeFeedWitness(blob: BytesLike): Uint8Array {
   const bytes = toBytes(blob);
@@ -79,13 +85,15 @@ export interface UpdateFeedCellsResult {
 
 /**
  * Move several feed cells of one committee forward to the same update, in one transaction. The feed
- * cells are inputs 0..n-1; input 0 is the leader and its witness carries the only blob (every
+ * cells are inputs 0..n-1 and must stay first (add fee inputs after them, as `completeFee` does):
+ * input 0 is the leader and its witness carries the only blob (every
  * requested feed with its proof), so the committee's signatures are checked once on chain. Each price
  * is verified against the live committee cell first, so a transaction the contract would reject is
  * never built. Every feed cell's lock must be satisfied by the caller's signer.
  */
 export async function updateFeedCells(p: UpdateFeedCellsParams): Promise<UpdateFeedCellsResult> {
   if (p.feedTypes.length === 0) throw new Error("no feed cells given");
+  if (p.feedTypes.length > MAX_FEEDS_PER_TX) throw new Error(`at most ${MAX_FEEDS_PER_TX} feed cells per transaction; split the batch`);
   const decoded = typeof p.update === "string" || p.update instanceof Uint8Array ? decodePriceUpdate(p.update) : p.update;
   const cells = await Promise.all(
     p.feedTypes.map(async (feedType) => {
@@ -97,6 +105,11 @@ export async function updateFeedCells(p: UpdateFeedCellsParams): Promise<UpdateF
   const committeeHash = cells[0]!.feed.data.publisherSetTypeHash.toLowerCase();
   if (cells.some((c) => c.feed.data.publisherSetTypeHash.toLowerCase() !== committeeHash)) {
     throw new Error("all feed cells in one transaction must trust the same committee");
+  }
+  // The contract elects one leader per code version, so a transaction mixes feed cells of one version.
+  const code = (c: (typeof cells)[number]) => `${c.feed.cell.cellOutput.type!.codeHash}:${c.feed.cell.cellOutput.type!.hashType}`.toLowerCase();
+  if (cells.some((c) => code(c) !== code(cells[0]!))) {
+    throw new Error("feed cells created under different contract versions cannot share one transaction; update them separately");
   }
   const ids = cells.map((c) => c.feed.data.feedId.toLowerCase());
   if (new Set(ids).size !== ids.length) throw new Error("each feed may appear once per transaction");

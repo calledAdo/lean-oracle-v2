@@ -7,6 +7,7 @@ import { findCommitteeCell } from "../ckb/cells.js";
 import { publisherSetTypeScript } from "../ckb/scripts.js";
 import { computeTypeId } from "../ckb/typeId.js";
 import { codeRefFor, type LeanOracleDeployment } from "../presets/deployment.js";
+import { MAX_UNTIL_AHEAD_MS, SINCE_RELATIVE_TIMESTAMP, SINCE_VALUE_MASK } from "../protocol/constants.js";
 import {
   encodePublisherSetData,
   isValidPublisherSetData,
@@ -25,7 +26,8 @@ export const DEFAULT_MIN_ROTATION_INTERVAL_S = 86_400n;
 
 /** `since` for a relative timestamp (bit 63 relative, bits 61-62 = timestamp metric), in seconds. */
 export function relativeTimestampSince(seconds: bigint): bigint {
-  return 0xc000_0000_0000_0000n | seconds;
+  if (seconds < 0n || seconds > SINCE_VALUE_MASK) throw new RangeError(`since value ${seconds} does not fit in 56 bits`);
+  return SINCE_RELATIVE_TIMESTAMP | seconds;
 }
 
 export interface BootstrapCommitteeParams {
@@ -33,7 +35,11 @@ export interface BootstrapCommitteeParams {
   deployment: LeanOracleDeployment;
   /** Initial committee: `governanceNonce` 0, `setIndex` 0, no previous set. */
   data: PublisherSetData;
-  /** Lock of the committee cell. Use an always-success lock so no key can block governance. */
+  /**
+   * Lock of the committee cell (default: the signer's own lock, whose key must then co-sign every
+   * governance transaction and could block it). Pass an always-success lock so no key can block
+   * governance; the committee type script keeps the cell and its capacity safe either way.
+   */
   lock?: Script;
 }
 
@@ -56,7 +62,7 @@ export interface GovernCommitteeParams {
   client: ccc.Client;
   deployment: LeanOracleDeployment;
   committee: Script;
-  /** OP_ROTATE, OP_ROTATE_REVOKE, OP_PAUSE, OP_UNPAUSE or OP_REVOKE_PREVIOUS. */
+  /** OP_ROTATE, OP_ROTATE_REVOKE, OP_PAUSE, OP_UNPAUSE or OP_REVOKE_PREVIOUS. The committee cell is input 0. */
   operation: number;
   next: PublisherSetData;
   /** Current-set quorum over `publisherSetUpdateHash(current, next, operation, committeeTypeHash)`. */
@@ -68,7 +74,8 @@ export interface GovernCommitteeParams {
 /**
  * One governance operation on the committee cell. Checks the transition locally first (same rules as
  * the contract). A routine rotation spends the cell with a relative `since` of the committee's
- * `minRotationIntervalS`, so it is only accepted once the cell is that old.
+ * `minRotationIntervalS`, so it is only accepted once the cell is that old, and carries the chain tip's
+ * header as a header dep: the contract allows `previous.untilMs` at most `MAX_UNTIL_AHEAD_MS` past it.
  */
 export async function governCommittee(p: GovernCommitteeParams): Promise<ccc.Transaction> {
   const live = await findCommitteeCell(p.client, p.committee);
@@ -88,6 +95,13 @@ export async function governCommittee(p: GovernCommitteeParams): Promise<ccc.Tra
   const needed = occupiedCapacity(output.lock as unknown as Script, output.type as unknown as Script, dataHex as Hex);
   if (output.capacity < needed) output.capacity = needed;
   tx.addOutput(output, dataHex);
+  if (needsRotationInterval(p.operation) && p.next.previous) {
+    const tip = await p.client.getTipHeader();
+    if (p.next.previous.untilMs > tip.timestamp + MAX_UNTIL_AHEAD_MS) {
+      throw new Error(`previous.untilMs ${p.next.previous.untilMs} is more than ${MAX_UNTIL_AHEAD_MS} ms past the chain tip (${tip.timestamp})`);
+    }
+    tx.headerDeps.push(tip.hash);
+  }
   // The committee keeps the contract version it was created under.
   tx.addCellDeps(cellDep(codeRefFor(p.deployment, "publisherSetType", live.cell.cellOutput.type!.codeHash as Hex).cellDep));
   const pop = p.proofOfPossession ? encodeSignatureBundle(p.proofOfPossession) : new Uint8Array();

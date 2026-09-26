@@ -17,7 +17,7 @@ use crate::publisher_set::PublisherSetData;
 /// Why a feed cell cannot be used.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeedCheckError {
-    /// Not a 125-byte feed cell.
+    /// Not a 129-byte feed cell.
     Malformed,
     /// A different feed than expected.
     WrongFeed,

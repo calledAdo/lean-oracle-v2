@@ -111,7 +111,7 @@ coordinator collects the files and sends the transaction.
 
 | `--op` | When | Notes |
 |---|---|---|
-| `rotate` | adding or removing a publisher | the old set keeps verifying ticks before `--until-ms` (the new set's first tick); only once the committee cell is `minRotationIntervalS` old (default 24 h) |
+| `rotate` | adding or removing a publisher | the old set keeps verifying ticks before `--until-ms` (the new set's first tick, at most an hour ahead); only once the committee cell is `minRotationIntervalS` old (default 24 h) |
 | `rotate-revoke` | keys compromised | drops every earlier set; no waiting period |
 | `pause` / `unpause` | emergency brake | feed cells refuse updates while paused; integrators treat stored prices as unusable |
 | `revoke-previous` | a retired key leaked after a rotation | drops the previous set at any time |

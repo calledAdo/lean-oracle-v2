@@ -1,6 +1,6 @@
 //! A publisher's signed per-tick observation (off-chain; docs/oracle-design.md section 5).
 //!
-//! `magic "TPOB" | version u8 | publisher_set_type_hash [32] | set_index u32 | tick_ms u64 |
+//! `magic "LOOB" | version u8 | publisher_set_type_hash [32] | set_index u32 | tick_ms u64 |
 //!  config_hash [32] | publisher_index u8 | entry_count u8 | entries`, entries strictly ascending by
 //! feed id: `feed_id [32] | price i64 | conf u64 | source_time_ms u64`.
 //! Signed as `ckbHash("LEAN/OBSERVATION/V1" || bytes)`.

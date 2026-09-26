@@ -83,7 +83,8 @@ publish every approved config with its signatures.
 
 ### 3.2 Governance (committee cell)
 
-The committee cell holds its keys, a `governance_nonce`, flags (`PAUSED`, `LOCKED`), a per-committee
+The committee cell holds its keys, a `governance_nonce`, a `PAUSED` flag (the only flag; any other
+bit is rejected), a per-committee
 `min_rotation_interval_s` (set at creation, default 24 h) and, after a routine rotation, the previous
 set with `previous_until_ms` (the first tick of the current set). Every change is one operation,
 authorized by a quorum of the **current** set over
@@ -93,7 +94,7 @@ committee with identical keys.
 
 | Operation | Effect | Extra requirements |
 |---|---|---|
-| `ROTATE` (1) | next set index; the outgoing set becomes `previous` until the new set's first tick | proof of possession from every new key; the committee cell is at least `min_rotation_interval_s` old (relative timestamp `since`) |
+| `ROTATE` (1) | next set index; the outgoing set becomes `previous` until the new set's first tick | proof of possession from every new key; the committee cell is at least `min_rotation_interval_s` old (relative timestamp `since`); at least one header dep, with `previous_until_ms` at most 1 hour past the newest header dep's timestamp |
 | `ROTATE_REVOKE` (2) | next set index; no previous set (emergency) | proof of possession; **no** interval |
 | `PAUSE` (3) / `UNPAUSE` (4) | set / clear `PAUSED` | none |
 | `REVOKE_PREVIOUS` (5) | drop the previous set at any time (e.g. retired keys leaked later) | none |
@@ -101,6 +102,13 @@ committee with identical keys.
 - The interval exists so that at most one previous set is ever kept. The chain measures it with block
   median time, which trails the wall clock by a minute or more, so a rotation may be refused as
   "immature" for a short while after the interval; retry.
+- The interval counts from the committee cell's **last** operation, so a pause, unpause or
+  revoke-previous restarts it. It is a rate limit on routine rotations, not a defence against a
+  hostile quorum (which can `ROTATE_REVOKE` at once).
+- `previous_until_ms` is chosen by the approving quorum. A header dep proves a block that already
+  exists, so the contract bounds it: at most `MAX_UNTIL_AHEAD_MS` (1 hour) past the newest header dep.
+  The SDK attaches the chain tip's header. Send `REVOKE_PREVIOUS` once every integrator you care about
+  has moved to the new set.
 - While paused, feed cells reject every update, and consumers treat stored prices as unusable
   (section 9).
 - The cell keeps its lock and never loses capacity, and it cannot be destroyed, so it is created

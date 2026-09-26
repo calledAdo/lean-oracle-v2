@@ -1,6 +1,8 @@
 export const MAX_PUBLISHERS = 9;
-export const GOVERNANCE_LOCKED = 0x01;
+/** The only governance flag: while set, feed cells accept no update and consumers use no price. */
 export const GOVERNANCE_PAUSED = 0x02;
+/** How far past the newest header dep a routine rotation may set `previous.untilMs`. */
+export const MAX_UNTIL_AHEAD_MS = 3_600_000n;
 /** Rotate to the next set; the outgoing set becomes \`previous\`. */
 export const OP_ROTATE = 1;
 /** Rotate and drop every earlier set (emergency; not subject to the rotation interval). */
@@ -9,6 +11,10 @@ export const OP_PAUSE = 3;
 export const OP_UNPAUSE = 4;
 /** Drop the previous set at any time. */
 export const OP_REVOKE_PREVIOUS = 5;
+/** CKB \`since\` flags for a relative timestamp (bit 63 relative, bits 61-62 = timestamp metric). */
+export const SINCE_RELATIVE_TIMESTAMP = 0xc000_0000_0000_0000n;
+/** The value bits of a \`since\` (seconds for the timestamp metric). */
+export const SINCE_VALUE_MASK = 0x00ff_ffff_ffff_ffffn;
 
 export const PUBLISHER_SET_MAGIC = "PSET";
 export const PUBLISHER_SET_VERSION = 2;

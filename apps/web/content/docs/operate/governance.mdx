@@ -28,7 +28,7 @@ The approval names the committee cell, so it is useless on any other committee. 
 
 | Operation | Use it when | Also needs |
 |---|---|---|
-| `rotate` | adding, removing or replacing a publisher | proof of possession from every new key; the committee cell must be at least the committee's minimum interval old (24 hours by default) |
+| `rotate` | adding, removing or replacing a publisher | proof of possession from every new key; the committee cell must be at least the committee's minimum interval old (24 hours by default); the new set's first tick at most an hour ahead (the tools attach a recent block header so the contract can check it) |
 | `rotate-revoke` | keys are compromised | proof of possession; no waiting |
 | `pause` / `unpause` | something is wrong and prices must stop | nothing else |
 | `revoke-previous` | a retired publisher's key leaked after a rotation | nothing else |
@@ -37,6 +37,8 @@ The approval names the committee cell, so it is useless on any other committee. 
   integrators settling at an exact past time keep working. The minimum interval exists so that only
   one previous set is ever kept.
 - `rotate-revoke` and `revoke-previous` drop the previous set at once.
+- The waiting period counts from the committee cell's last operation, so a pause or unpause
+  restarts it.
 - While paused, feed cells refuse updates and the consumer helpers treat stored prices as unusable.
 - Committee cells can't be destroyed and never lose their CKB.
 

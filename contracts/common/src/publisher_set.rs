@@ -16,8 +16,12 @@ use crate::protocol_hash::{ckb_hash, DOMAIN_SET_POP, DOMAIN_SET_STATE, DOMAIN_SE
 pub const PUBLISHER_SET_MAGIC: &[u8; 4] = b"PSET";
 pub const PUBLISHER_SET_VERSION: u8 = 2;
 pub const MAX_PUBLISHERS: usize = 9;
-pub const GOVERNANCE_LOCKED: u8 = 0x01;
+/// The only governance flag: while set, feed cells accept no update and consumers use no price.
 pub const GOVERNANCE_PAUSED: u8 = 0x02;
+/// How far past the newest header dep a routine rotation may set `previous_until_ms`.
+pub const MAX_UNTIL_AHEAD_MS: u64 = 3_600_000;
+/// Fixed part of the encoding: magic, version, network_id, nonce, flags, reserved byte, interval.
+const FIXED_LEN: usize = 4 + 1 + 32 + 8 + 1 + 1 + 8;
 
 /// Rotate to the next set; the outgoing set becomes `previous`.
 pub const OP_ROTATE: u8 = 1;
@@ -99,7 +103,7 @@ pub struct PublisherSetData {
 /// Why a governance transition is invalid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransitionError {
-    /// Nonce, network, interval or the LOCKED flag broke continuity.
+    /// Nonce, network or interval broke continuity.
     Continuity,
     /// The next state is not the one this operation produces.
     Operation,
@@ -107,7 +111,7 @@ pub enum TransitionError {
 
 impl PublisherSetData {
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < 4 + 1 + 32 + 8 + 2 + 8 || &data[..4] != PUBLISHER_SET_MAGIC || data[4] != PUBLISHER_SET_VERSION {
+        if data.len() < FIXED_LEN || &data[..4] != PUBLISHER_SET_MAGIC || data[4] != PUBLISHER_SET_VERSION {
             return None;
         }
         let mut offset = 5usize;
@@ -161,7 +165,7 @@ impl PublisherSetData {
         if !self.current.validate() || self.min_rotation_interval_s == 0 {
             return false;
         }
-        if self.governance_flags & !(GOVERNANCE_LOCKED | GOVERNANCE_PAUSED) != 0 {
+        if self.governance_flags & !GOVERNANCE_PAUSED != 0 {
             return false;
         }
         if let Some(previous) = &self.previous {
@@ -215,7 +219,6 @@ impl PublisherSetData {
         if next.network_id != self.network_id
             || self.governance_nonce.checked_add(1) != Some(next.governance_nonce)
             || next.min_rotation_interval_s != self.min_rotation_interval_s
-            || (self.governance_flags & GOVERNANCE_LOCKED != 0 && next.governance_flags & GOVERNANCE_LOCKED == 0)
         {
             return Err(TransitionError::Continuity);
         }
@@ -316,7 +319,7 @@ mod tests {
     fn round_trips_and_rejects_bad_encodings() {
         let old = genesis();
         let bytes = old.to_bytes();
-        assert_eq!(bytes.len(), 4 + 1 + 32 + 8 + 2 + 8 + 5 + 33 + 1);
+        assert_eq!(bytes.len(), FIXED_LEN + 5 + 33 + 1);
         assert_eq!(PublisherSetData::from_bytes(&bytes), Some(old.clone()));
 
         let next = rotated(&old, &[0x22, 0x33, 0x44], 1_000);
@@ -334,8 +337,10 @@ mod tests {
 
         let zero_interval = PublisherSetData { min_rotation_interval_s: 0, ..old.clone() };
         assert_eq!(PublisherSetData::from_bytes(&zero_interval.to_bytes()), None);
-        let unknown_flag = PublisherSetData { governance_flags: 0x04, ..old.clone() };
-        assert_eq!(PublisherSetData::from_bytes(&unknown_flag.to_bytes()), None);
+        for flag in [0x01, 0x04, 0x80] {
+            let unknown_flag = PublisherSetData { governance_flags: flag, ..old.clone() };
+            assert_eq!(PublisherSetData::from_bytes(&unknown_flag.to_bytes()), None);
+        }
         let gap = PublisherSetData { previous: Some(PreviousSet { set: set(5, &[0x11]), until_ms: 1 }), ..next.clone() };
         assert_eq!(PublisherSetData::from_bytes(&gap.to_bytes()), None);
         let zero_until = PublisherSetData { previous: Some(PreviousSet { set: old.current.clone(), until_ms: 0 }), ..next };
@@ -408,14 +413,13 @@ mod tests {
 
     #[test]
     fn continuity_is_enforced_for_every_operation() {
-        let old = PublisherSetData { governance_flags: GOVERNANCE_LOCKED, ..genesis() };
+        let old = genesis();
         let next = rotated(&old, &[0x22], 1_000);
         assert_eq!(old.check_transition(&next, OP_ROTATE), Ok(()));
         for broken in [
             PublisherSetData { governance_nonce: 5, ..next.clone() },
             PublisherSetData { network_id: [0xbb; 32], ..next.clone() },
             PublisherSetData { min_rotation_interval_s: 1, ..next.clone() },
-            PublisherSetData { governance_flags: 0, ..next.clone() },
         ] {
             assert_eq!(old.check_transition(&broken, OP_ROTATE), Err(TransitionError::Continuity));
         }

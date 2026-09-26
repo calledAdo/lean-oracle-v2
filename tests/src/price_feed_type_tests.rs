@@ -457,3 +457,29 @@ fn previous_set_verifies_ticks_before_the_switch_until_revoked() {
     let tx = env.update_tx(&base, &applied(&base, &before), &before, vec![]);
     assert_script_error(env.verify(&tx), ERROR_UPDATE_SET);
 }
+
+#[test]
+fn multi_feed_cost_at_larger_batches() {
+    // Sizes the SDK cap on feed cells per transaction (updateFeedCells).
+    let mut env = Env::new(Committee::new(9, 0));
+    let quorum = env.committee.quorum_indexes();
+    let feeds: Vec<[u8; 32]> = (0..24).map(|i| lean_oracle_common::protocol_hash::feed_id(format!("Crypto.T{i}/USD").as_bytes())).collect();
+    let blob = env.signed(T0, feeds.iter().map(|f| message(*f, 1_000_000_000)).collect(), &quorum);
+    let uninitialized = env.uninitialized();
+    let base = |f: [u8; 32]| PriceFeedData { feed_id: f, ..uninitialized.clone() };
+    let mut report = Vec::new();
+    for n in [1usize, 5, 10, 16, 20, 24] {
+        let moves = feeds[..n]
+            .iter()
+            .enumerate()
+            .map(|(i, f)| Move { old: base(*f), new: Some(applied(&base(*f), &blob)), blob: (i == 0).then(|| blob.clone()) })
+            .collect();
+        let tx = env.multi_tx(moves);
+        let cycles = env.context.verify_tx(&tx, 3_500_000_000).expect("multi-feed update");
+        report.push((n, cycles));
+    }
+    println!("price_feed_type N feeds in one tx, quorum 7 of 9: {report:?}");
+    // Growth is about 0.25M cycles per extra feed; the SDK caps a batch at 32 feeds. Keep 24 feeds at
+    // 7-of-9 under 100M cycles (the block limit is 3.5B).
+    assert!(report.last().unwrap().1 < 100_000_000);
+}

@@ -15,6 +15,7 @@ import {
   OP_ROTATE_REVOKE,
   OP_UNPAUSE,
   GOVERNANCE_PAUSED,
+  MAX_UNTIL_AHEAD_MS,
   needsProofOfPossession,
   publisherSetPopHash,
   publisherSetUpdateHash,
@@ -64,6 +65,8 @@ export interface NextStateOptions {
   remove?: string[];
   /** Rotations that keep history: first tick of the new set (the previous set verifies ticks before it). */
   untilMs?: bigint;
+  /** The clock used to check `untilMs` (default: now). */
+  nowMs?: number;
 }
 
 /**
@@ -82,6 +85,8 @@ export function nextState(current: PublisherSetData, operation: number, options:
       next = { ...rest, current: { setIndex: current.current.setIndex + 1, pubkeys: keys } };
       if (operation === OP_ROTATE) {
         if (options.untilMs === undefined) throw new Error("a routine rotation needs the new set's first tick (--until-ms)");
+        const latest = BigInt(options.nowMs ?? Date.now()) + MAX_UNTIL_AHEAD_MS;
+        if (options.untilMs > latest) throw new Error(`--until-ms is more than an hour ahead; the contract refuses a switch tick past the chain tip + ${MAX_UNTIL_AHEAD_MS} ms`);
         next.previous = { set: current.current, untilMs: options.untilMs };
       }
       break;

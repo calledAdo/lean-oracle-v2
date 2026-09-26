@@ -6,7 +6,6 @@ import { bytesToHex, compareBytes, hexToFixed, type BytesLike, toBytes } from ".
 import { Reader, Writer } from "../internal/codec.js";
 import type { Hex } from "../types.js";
 import {
-  GOVERNANCE_LOCKED,
   GOVERNANCE_PAUSED,
   MAX_PUBLISHERS,
   OP_PAUSE,
@@ -60,7 +59,7 @@ export function isValidPublisherSet(set: PublisherSet): boolean {
 
 export function isValidPublisherSetData(data: PublisherSetData): boolean {
   if (!isValidPublisherSet(data.current) || data.minRotationIntervalS <= 0n) return false;
-  if ((data.governanceFlags & ~(GOVERNANCE_LOCKED | GOVERNANCE_PAUSED)) !== 0) return false;
+  if ((data.governanceFlags & ~GOVERNANCE_PAUSED) !== 0) return false;
   const p = data.previous;
   return !p || (isValidPublisherSet(p.set) && p.untilMs > 0n && p.set.setIndex + 1 === data.current.setIndex);
 }
@@ -186,10 +185,9 @@ export function transitionError(current: PublisherSetData, next: PublisherSetDat
   if (
     next.networkId.toLowerCase() !== current.networkId.toLowerCase() ||
     next.governanceNonce !== current.governanceNonce + 1n ||
-    next.minRotationIntervalS !== current.minRotationIntervalS ||
-    ((current.governanceFlags & GOVERNANCE_LOCKED) !== 0 && (next.governanceFlags & GOVERNANCE_LOCKED) === 0)
+    next.minRotationIntervalS !== current.minRotationIntervalS
   ) {
-    return "continuity: nonce must advance by one; network, interval and the LOCKED flag must not change";
+    return "continuity: nonce must advance by one; network and interval must not change";
   }
   const sameFlags = next.governanceFlags === current.governanceFlags;
   const sameSets = sameSet(next.current, current.current) && samePrevious(next.previous, current.previous);

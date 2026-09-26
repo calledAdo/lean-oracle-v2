@@ -5,6 +5,9 @@
 //!   `update_hash(committee, next, op)`; rotations also need proof of possession from every new key.
 //!   A routine rotation (`OP_ROTATE`) needs the committee cell to be at least
 //!   `min_rotation_interval_s` old, proven with a relative timestamp `since` on the input.
+//!   The same rotation carries at least one header dep, and `previous_until_ms` may be at most
+//!   `MAX_UNTIL_AHEAD_MS` past the newest header dep's timestamp: a header dep proves a block that
+//!   exists, so this bounds the old set's window by the clock.
 //!   The cell keeps its lock and never loses capacity, so an always-success lock is safe.
 //! - Burn (1 → 0): never.
 //!
@@ -28,14 +31,14 @@ use ckb_std::{
     ckb_constants::Source,
     ckb_types::prelude::*,
     high_level::{
-        load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type, load_input, load_input_since, load_script,
+        load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type, load_header, load_input, load_input_since, load_script,
         load_script_hash, load_witness_args, QueryIter,
     },
 };
 use lean_oracle_common::{
     errors::*,
     protocol_hash::type_id_seed,
-    publisher_set::{PublisherSetData, TransitionError},
+    publisher_set::{PublisherSetData, TransitionError, MAX_UNTIL_AHEAD_MS},
     signatures::SignatureBundle,
 };
 
@@ -89,6 +92,11 @@ fn validate_update() -> i8 {
         if let Err(code) = check_interval(old.min_rotation_interval_s) {
             return code;
         }
+        if let Some(previous) = &new.previous {
+            if let Err(code) = check_until(previous.until_ms) {
+                return code;
+            }
+        }
     }
 
     let committee = load_script_hash().map_err(|_| ERROR_SYSCALL);
@@ -141,6 +149,19 @@ fn check_interval(interval_s: u64) -> Result<(), i8> {
         return Err(ERROR_PUBLISHER_SET_INTERVAL);
     }
     Ok(())
+}
+
+/// `until_ms` is at most `MAX_UNTIL_AHEAD_MS` past the newest header dep (at least one is required).
+fn check_until(until_ms: u64) -> Result<(), i8> {
+    let mut newest: Option<u64> = None;
+    for header in QueryIter::new(load_header, Source::HeaderDep) {
+        let timestamp: u64 = header.raw().timestamp().unpack();
+        newest = Some(newest.map_or(timestamp, |n| n.max(timestamp)));
+    }
+    match newest {
+        Some(timestamp) if until_ms <= timestamp.saturating_add(MAX_UNTIL_AHEAD_MS) => Ok(()),
+        _ => Err(ERROR_PUBLISHER_SET_UNTIL),
+    }
 }
 
 fn update_witness() -> Result<alloc::vec::Vec<u8>, i8> {

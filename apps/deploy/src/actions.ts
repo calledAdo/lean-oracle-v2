@@ -206,6 +206,7 @@ export async function govern(ctx: Context, name: string, opName: string, nextFil
   const txHash = await send(ctx, tx, `${opName} ${name}`);
   if (!txHash) return;
   if (needsProofOfPossession(operation)) ctx.record.addRotation(name, { setIndex: next.current.setIndex, publishers: next.current.pubkeys.length, txHash, at: now() });
+  ctx.record.addGovernance(name, opName, txHash, now(), { setIndex: next.current.setIndex, paused: (next.governanceFlags & 0x02) !== 0, previous: next.previous?.set.setIndex ?? null });
   publishToSdk(ctx);
 }
 
@@ -247,7 +248,7 @@ export async function validate(network: string, target: string, name: string | u
     if (target === "deploy:code") {
       for (const contract of CONTRACTS) check(existsSync(resolve(REPO_ROOT, ctx.config.binaries[contract])), `binary ${ctx.config.binaries[contract]}`);
     }
-    if (target === "deploy:committee" || target === "rotate:committee") {
+    if (target === "deploy:committee" || target === "govern:committee") {
       const record: DeploymentRecord = ctx.record.read();
       check(Boolean(record.contracts.priceFeedType && record.contracts.publisherSetType), "contracts deployed");
       if (name) {

@@ -4,6 +4,7 @@ export {
   burnFeedCell,
   createFeedCell,
   encodeFeedWitness,
+  MAX_FEEDS_PER_TX,
   updateFeedCell,
   updateFeedCells,
   type CreateFeedCellParams,

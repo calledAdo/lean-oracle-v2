@@ -32,6 +32,24 @@ type Row = { committee: string; tick_ms: number | bigint; blob: Uint8Array };
 const toStored = (row: Row | undefined): StoredUpdate | undefined =>
   row && { committee: row.committee as Hex, tickMs: BigInt(row.tick_ms), blob: row.blob };
 
+/**
+ * Stores hold raw update blobs, so a store written by an older format (v1 `TPOU` blobs, v1 committee
+ * data) must not be reused: it would serve or decode blobs this code no longer reads. SQLite's
+ * `user_version` records the format; a store without it that already holds data is from before it.
+ */
+export const STORE_FORMAT = 2;
+
+export function checkStoreFormat(db: DatabaseSync, table: string, path: string): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version === STORE_FORMAT) return;
+  const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number | bigint };
+  if (version === 0 && Number(n) === 0) {
+    db.exec(`PRAGMA user_version = ${STORE_FORMAT}`);
+    return;
+  }
+  throw new Error(`${path} was written by an older data format (store format ${version}, expected ${STORE_FORMAT}); start with a fresh data volume`);
+}
+
 export class MirrorStore {
   private readonly db: DatabaseSync;
 
@@ -45,6 +63,7 @@ export class MirrorStore {
       CREATE INDEX IF NOT EXISTS feed_ticks_by_time ON feed_ticks (feed_id, tick_ms);
       CREATE TABLE IF NOT EXISTS equivocations (committee TEXT, tick_ms INTEGER, header_hash TEXT, blob BLOB NOT NULL, received_ms INTEGER NOT NULL, PRIMARY KEY (committee, tick_ms, header_hash));
     `);
+    checkStoreFormat(this.db, "updates", path);
   }
 
   /** Store a verified update. */

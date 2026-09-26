@@ -12,7 +12,10 @@ current testnet deployment until it is redeployed.
   `signProofOfPossession(next, committee, key, index)`.
 - `governCommittee` replaces `rotateCommittee` and covers every operation (a routine rotation sets
   the relative `since` for the committee's interval).
-- `updateFeedCells`: several feed cells of one committee in one transaction, one signature check.
+- `updateFeedCells`: several feed cells of one committee in one transaction, one signature check
+  (at most `MAX_FEEDS_PER_TX` = 32, of one contract version).
+- A routine rotation carries the chain tip's header; `previous.untilMs` at most `MAX_UNTIL_AHEAD_MS`
+  (1 hour) past it. The `LOCKED` governance flag is gone; `PAUSED` is the only flag.
 - Feed cell data is 129 bytes (`setIndex`); `isFeedPriceTrusted(feed, committee)` and
   `LeanOracleClient.isFeedPriceTrusted`.
 - `verifyPriceUpdate` accepts the previous set for ticks before its switch.

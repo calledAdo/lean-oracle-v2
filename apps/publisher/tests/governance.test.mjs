@@ -72,6 +72,9 @@ test("governance: pause, unpause, revoke-previous and emergency rotation", async
   assert.equal(emergency.previous, undefined);
   assert.equal(emergency.current.pubkeys.length, 3);
   assert.throws(() => nextState(current, OP_ROTATE, { add: [publicKeyOf(keys[4])] }), /until-ms/);
+  const now = 1_700_000_000_000;
+  assert.throws(() => nextState(current, OP_ROTATE, { add: [publicKeyOf(keys[4])], untilMs: BigInt(now + 3_600_001), nowMs: now }), /hour ahead/);
+  nextState(current, OP_ROTATE, { add: [publicKeyOf(keys[4])], untilMs: BigInt(now + 3_600_000), nowMs: now });
   // Signing refuses an operation that does not produce this state.
   await assert.rejects(signGovernance(current, paused, OP_UNPAUSE, COMMITTEE, signer(keys[0])), /unpause/);
 });

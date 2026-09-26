@@ -296,7 +296,9 @@ async function governance(command: string, values: Values, positionals: string[]
       if (!values.set) throw new Error("next-set requires --set");
       const current = readSet(values.set);
       const op = parseOperation(values.op);
-      const untilMs = values["until-ms"] !== undefined ? BigInt(values["until-ms"]) : undefined;
+      const raw = values["until-ms"];
+      if (raw !== undefined && !/^\d+$/.test(raw)) throw new Error("--until-ms must be a tick in milliseconds (an integer)");
+      const untilMs = raw !== undefined ? BigInt(raw) : undefined;
       const next = nextState(current, op, { add: values.add, remove: values.remove, untilMs });
       process.stderr.write(json(diffSets(current, next, op)));
       process.stdout.write(`${encodeSet(next)}\n`);

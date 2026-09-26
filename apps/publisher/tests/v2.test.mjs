@@ -86,6 +86,46 @@ test("backup re-proposes: a primary that crashes after one signature does not lo
   assert.ok(finals.every((b) => headerOf(b) === primaryHeader), "with the primary's header");
 });
 
+test("backup that already holds every observation still asks peers and re-proposes the signed header", async () => {
+  // Pins the fix in node.ts maybePropose independent of which roles the header hashes assign.
+  const c = makeCommittee(4);
+  await c.runTick(T0);
+  await c.runTick(T0 + 1000);
+  const tick = T0 + 2000;
+  const t = BigInt(tick);
+  const [primary, backup] = c.nodes[0].node.leaders(t);
+  const [witness, other] = [0, 1, 2, 3].filter((i) => i !== primary && i !== backup);
+  const { emitMockQuotes, mockMarketsFor } = await import("../dist/sources/mock.js");
+  const { BASE } = await import("./helpers.mjs");
+  const mocks = mockMarketsFor(c.config, BASE);
+  c.clock.now = tick;
+  for (const x of c.nodes) emitMockQuotes(x.marketData, mocks, tick - 100);
+  const only = async (up, fn) => {
+    for (let i = 0; i < 4; i++) c.hub.setDown(i, !up.includes(i));
+    await fn();
+    await c.hub.settle();
+  };
+  // 1. Three publishers exchange observations (the fourth is away, so the primary cannot propose early).
+  await only([primary, witness, backup], () => Promise.all([primary, witness, backup].map((i) => c.nodes[i].node.observe(t))));
+  // 2. The fourth observation reaches only the backup: it now holds all four.
+  await only([backup, other], () => c.nodes[other].node.observe(t));
+  assert.equal(c.nodes[backup].node["ticks"].get(t).observations.size, 4);
+  // 3. The primary proposes from three observations after its grace; only the witness signs with it (2 of 3).
+  c.clock.now = tick + 100;
+  await only([primary, witness], () => c.nodes[primary].node.maybePropose(t));
+  const primaryHeader = [...c.nodes[witness].node["ticks"].get(t).derived.keys()][0];
+  assert.ok(primaryHeader);
+  assert.ok(!c.nodes.some((x) => x.store.finalizedAt(t)));
+  // 4. The primary is gone; the backup's slot opens. It must ask first and re-propose the signed header.
+  c.clock.now = tick + c.config.observationDeadlineMs;
+  for (let call = 0; call < 2; call++) {
+    await only([witness, backup, other], () => Promise.all([witness, backup, other].map((i) => c.nodes[i].node.maybePropose(t))));
+  }
+  const finals = [witness, backup, other].map((i) => c.nodes[i].store.finalizedAt(t));
+  assert.ok(finals.every(Boolean), "the tick finalized without the primary");
+  assert.ok(finals.every((b) => headerOf(b) === primaryHeader), "with the header the witness already signed");
+});
+
 test("wire frames round-trip", () => {
   const signed = pub.signObservation(
     { publisherSetTypeHash: SET_TYPE_HASH, setIndex: 0, tickMs: 5n, configHash: `0x${"cf".repeat(32)}`, publisherIndex: 1, entries: [{ feedId: BTC, price: 7n, conf: 1n, sourceTimeMs: 4n }] },

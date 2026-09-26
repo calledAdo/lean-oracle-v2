@@ -105,6 +105,8 @@ export function applyVerifiedPrice(current: PriceFeedData, verified: VerifiedPri
 /**
  * Whether a consumer may use the price in a feed cell now: authenticated, and the committee is not
  * paused and still trusts the key set that signed it. Same rule as Rust `consumer::check_feed_cell`.
+ * Off chain this is a snapshot: a pause can land right after the committee cell was read. Only an
+ * on-chain check (the committee cell as a cell dep) is exact.
  */
 export function isFeedPriceTrusted(data: PriceFeedData, committee: PublisherSetData): boolean {
   return isInitialized(data) && !isPaused(committee) && trustsSet(committee, data.setIndex);

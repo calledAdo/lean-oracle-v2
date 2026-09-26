@@ -67,7 +67,14 @@ export class RecordStore {
       const committee = record.committees[name];
       if (!committee) throw new Error(`unknown committee ${name}`);
       committee.rotations.push(rotation);
-      record.history.push({ action: "rotate:committee", txHash: rotation.txHash, at: rotation.at, detail: { name, setIndex: rotation.setIndex } });
+    });
+  }
+
+  /** Every governance operation (rotate, rotate-revoke, pause, unpause, revoke-previous) in the history. */
+  addGovernance(name: string, operation: string, txHash: Hex, at: string, detail: Record<string, unknown>): void {
+    this.update((record) => {
+      if (!record.committees[name]) throw new Error(`unknown committee ${name}`);
+      record.history.push({ action: "govern:committee", txHash, at, detail: { name, operation, ...detail } });
     });
   }
 

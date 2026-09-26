@@ -64,7 +64,7 @@ jobs:
           docker build -q -t lean-oracle-publisher:dev -f apps/publisher/Dockerfile .
           docker build -q -t lean-oracle-mirror:dev -f apps/mirror/Dockerfile .
       - name: End-to-end tests
-        run: LEAN_DEVNET=1 node --test apps/deploy/tests/
+        run: LEAN_DEVNET=1 node --test --test-concurrency=1 apps/deploy/tests/  # suites share the devnet deployer account
       - name: Logs on failure
         if: failure()
         run: |

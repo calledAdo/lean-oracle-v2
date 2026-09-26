@@ -59,6 +59,7 @@ for (const name of ["majors", "ckb"]) {
   }
 }
 
+mkdirSync(new URL("../src/data/", import.meta.url), { recursive: true });
 writeFileSync(new URL("../src/data/committees.json", import.meta.url), `${JSON.stringify({ committees, feeds }, null, 2)}\n`);
 
 const dir = new URL("../content/docs/feeds/", import.meta.url);

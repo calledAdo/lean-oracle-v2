@@ -155,6 +155,7 @@ fn applied(base: &PriceFeedData, blob: &[u8]) -> PriceFeedData {
         ema_conf: m.ema_conf,
         source_time_ms: m.source_time_ms,
         num_publishers: m.num_publishers,
+        set_index: blob.header.set_index,
         ..base.clone()
     }
 }
@@ -301,4 +302,158 @@ fn update_cycles_for_max_committee() {
     let tx = env.update_tx(&base, &applied(&base, &blob), &blob, vec![]);
     let cycles = env.verify(&tx).expect("quorum 7 of 9");
     println!("price_feed_type update, quorum 7 of 9: {cycles} cycles");
+}
+
+/// One cell in a multi-feed transaction: `new = None` burns it; `blob` goes in its witness.
+struct Move {
+    old: PriceFeedData,
+    new: Option<PriceFeedData>,
+    blob: Option<Vec<u8>>,
+}
+
+impl Env {
+    fn multi_tx(&mut self, moves: Vec<Move>) -> TransactionView {
+        let mut deps = self.deps();
+        deps.push(self.set_dep.clone());
+        let mut tx = TransactionBuilder::default().cell_deps(deps);
+        for m in moves {
+            let (cell, feed_type) = self.live_feed(&m.old);
+            let witness = match &m.blob {
+                Some(blob) => {
+                    let mut bytes = (blob.len() as u32).to_le_bytes().to_vec();
+                    bytes.extend_from_slice(blob);
+                    WitnessArgs::new_builder().input_type(Some(Bytes::from(bytes)).pack()).build()
+                }
+                None => WitnessArgs::default(),
+            };
+            tx = tx.input(CellInput::new_builder().previous_output(cell).build()).witness(witness.as_bytes().pack());
+            if let Some(new) = &m.new {
+                tx = tx
+                    .output(CellOutput::new_builder().capacity(CAPACITY / 2).lock(self.lock.clone()).type_(Some(feed_type).pack()).build())
+                    .output_data(Bytes::from(new.to_bytes()).pack());
+            }
+        }
+        self.context.complete_tx(tx.build())
+    }
+}
+
+fn sol() -> [u8; 32] {
+    lean_oracle_common::protocol_hash::feed_id(b"Crypto.SOL/USD")
+}
+
+#[test]
+fn single_feed_update_stays_within_the_cycle_budget() {
+    // Regression contract (D11): single-feed update at 3-of-4 costs at most 24.1M + 5%.
+    let mut env = Env::new(Committee::new(4, 0));
+    let quorum = env.committee.quorum_indexes();
+    let base = env.uninitialized();
+    let blob = env.signed(T0, vec![message(btc(), 6_700_000_000_000), message(eth(), 312_000_000_000)], &quorum);
+    let tx = env.update_tx(&base, &applied(&base, &blob), &blob, vec![]);
+    let cycles = env.verify(&tx).expect("single feed");
+    assert!(cycles <= 25_300_000, "single-feed update costs {cycles} cycles, budget 25.3M");
+}
+
+#[test]
+fn several_feeds_share_one_signature_check() {
+    let mut env = Env::new(Committee::new(4, 0));
+    let quorum = env.committee.quorum_indexes();
+    let feeds = [btc(), eth(), sol()];
+    let blob = env.signed(T0, feeds.iter().map(|f| message(*f, 1_000_000_000)).collect(), &quorum);
+    let uninitialized = env.uninitialized();
+    let base = |f: [u8; 32]| PriceFeedData { feed_id: f, ..uninitialized.clone() };
+    let mut cost = Vec::new();
+    for n in 1..=3 {
+        let moves = feeds[..n]
+            .iter()
+            .enumerate()
+            .map(|(i, f)| Move { old: base(*f), new: Some(applied(&base(*f), &blob)), blob: (i == 0).then(|| blob.clone()) })
+            .collect();
+        let tx = env.multi_tx(moves);
+        cost.push(env.verify(&tx).expect("multi-feed update"));
+    }
+    println!("price_feed_type 1/2/3 feeds in one tx, quorum 3 of 4: {cost:?} cycles");
+    // Each extra feed costs a Merkle proof, not another signature check (~8M per signature).
+    assert!(cost[2] - cost[0] < 8_000_000, "3 feeds cost {} more than 1", cost[2] - cost[0]);
+}
+
+#[test]
+fn followers_must_be_in_the_leaders_update() {
+    let mut env = Env::new(Committee::new(4, 0));
+    let quorum = env.committee.quorum_indexes();
+    let btc_blob = env.signed(T0, vec![message(btc(), 1_000_000_000)], &quorum);
+    let eth_blob = env.signed(T0 + 1000, vec![message(eth(), 2_000_000_000)], &quorum);
+    let btc_base = PriceFeedData { feed_id: btc(), ..env.uninitialized() };
+    let eth_base = PriceFeedData { feed_id: eth(), ..env.uninitialized() };
+    // Each cell carries its own, different update: the follower's feed is not in the leader's blob.
+    let tx = env.multi_tx(vec![
+        Move { old: btc_base.clone(), new: Some(applied(&btc_base, &btc_blob)), blob: Some(btc_blob.clone()) },
+        Move { old: eth_base.clone(), new: Some(applied(&eth_base, &eth_blob)), blob: Some(eth_blob) },
+    ]);
+    assert_script_error(env.verify(&tx), ERROR_UPDATE_FEED_NOT_FOUND);
+}
+
+#[test]
+fn a_burned_cell_is_never_the_leader() {
+    let mut env = Env::new(Committee::new(4, 0));
+    let quorum = env.committee.quorum_indexes();
+    let blob = env.signed(T0, vec![message(btc(), 1_000_000_000), message(eth(), 2_000_000_000)], &quorum);
+    // Under-quorum blob parked on a cell that is being burned (its script does not verify anything).
+    let forged = env.signed(T0, vec![message(btc(), 1_000_000_000), message(eth(), 9_000_000_000)], &quorum[..1]);
+    let btc_base = PriceFeedData { feed_id: btc(), ..env.uninitialized() };
+    let eth_base = PriceFeedData { feed_id: eth(), ..env.uninitialized() };
+    let tx = env.multi_tx(vec![
+        Move { old: btc_base.clone(), new: None, blob: Some(forged.clone()) },
+        Move { old: eth_base.clone(), new: Some(applied(&eth_base, &forged)), blob: None },
+    ]);
+    // The eth cell leads itself and has no blob of its own.
+    assert_script_error(env.verify(&tx), ERROR_FEED_WITNESS_MALFORMED);
+    let tx = env.multi_tx(vec![
+        Move { old: btc_base, new: None, blob: Some(forged) },
+        Move { old: eth_base.clone(), new: Some(applied(&eth_base, &blob)), blob: Some(blob) },
+    ]);
+    env.verify(&tx).expect("the updating cell leads and verifies its own blob");
+}
+
+#[test]
+fn a_cell_of_another_committee_is_not_a_leader() {
+    let mut env = Env::new(Committee::new(4, 0));
+    let quorum = env.committee.quorum_indexes();
+    let blob = env.signed(T0, vec![message(btc(), 1_000_000_000), message(eth(), 2_000_000_000)], &quorum);
+    let foreign = PriceFeedData { feed_id: btc(), publisher_set_type_hash: [0x99; 32], ..Default::default() };
+    let eth_base = PriceFeedData { feed_id: eth(), ..env.uninitialized() };
+    // The foreign cell updates too (it will fail on its own), but it cannot lead the eth cell.
+    let tx = env.multi_tx(vec![
+        Move { old: foreign.clone(), new: Some(foreign), blob: Some(blob.clone()) },
+        Move { old: eth_base.clone(), new: Some(applied(&eth_base, &blob)), blob: None },
+    ]);
+    let error = env.verify(&tx).expect_err("foreign cell fails").to_string();
+    assert!(!error.contains(&format!("error code {ERROR_UPDATE_SIGNATURE} ")), "eth must not borrow a foreign leader: {error}");
+}
+
+#[test]
+fn previous_set_verifies_ticks_before_the_switch_until_revoked() {
+    let old = Committee::new(4, 0);
+    let new = Committee::new(4, 1);
+    let switch = T0 + 10_000;
+    let rotated = PublisherSetData {
+        governance_nonce: 1,
+        current: new.data.current.clone(),
+        previous: Some(lean_oracle_common::publisher_set::PreviousSet { set: old.data.current.clone(), until_ms: switch }),
+        ..old.data.clone()
+    };
+    let mut env = Env::with_set_data(Committee::new(4, 0), Some(rotated.clone()));
+    let base = env.uninitialized();
+    let before = signed_update(&old, env.set_type_hash, switch - 1_000, vec![message(btc(), 1)], &[0, 1, 2]).to_bytes();
+    let tx = env.update_tx(&base, &applied(&base, &before), &before, vec![]);
+    env.verify(&tx).expect("previous set, tick before the switch");
+
+    let after = signed_update(&old, env.set_type_hash, switch, vec![message(btc(), 1)], &[0, 1, 2]).to_bytes();
+    let tx = env.update_tx(&base, &applied(&base, &after), &after, vec![]);
+    assert_script_error(env.verify(&tx), ERROR_UPDATE_SET);
+
+    let revoked = PublisherSetData { governance_nonce: 2, previous: None, ..rotated };
+    let mut env = Env::with_set_data(Committee::new(4, 0), Some(revoked));
+    let base = env.uninitialized();
+    let tx = env.update_tx(&base, &applied(&base, &before), &before, vec![]);
+    assert_script_error(env.verify(&tx), ERROR_UPDATE_SET);
 }

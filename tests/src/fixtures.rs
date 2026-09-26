@@ -25,7 +25,9 @@ impl Committee {
             network_id: [0xaa; 32],
             governance_nonce: set_index as u64,
             governance_flags: 0,
+            min_rotation_interval_s: 86_400,
             current: PublisherSet { set_index, pubkeys },
+            previous: None,
         };
         Self { keys, data }
     }

@@ -8,7 +8,10 @@
 import type { CellDepInfo, Hex, Script } from "../types.js";
 
 export type NetworkName = "devnet" | "testnet" | "mainnet";
-export type ContractName = "priceFeedType" | "publisherSetType";
+/** Contracts every deployment has. */
+export type CoreContractName = "priceFeedType" | "publisherSetType";
+/** `alwaysSuccessLock` locks committee cells so no key can block governance (optional in older records). */
+export type ContractName = CoreContractName | "alwaysSuccessLock";
 
 export interface CodeRef {
   codeHash: Hex;
@@ -26,9 +29,9 @@ export interface CommitteeRef {
 /** Resolved view: the current contract versions, all versions, and the committees. */
 export interface LeanOracleDeployment {
   network: NetworkName;
-  contracts: Record<ContractName, CodeRef>;
+  contracts: Record<CoreContractName, CodeRef> & Partial<Record<"alwaysSuccessLock", CodeRef>>;
   /** Every deployed version of each contract, by version number. */
-  contractVersions?: Record<ContractName, Record<number, CodeRef>>;
+  contractVersions?: Partial<Record<ContractName, Record<number, CodeRef>>>;
   committees: Record<string, CommitteeRef>;
 }
 
@@ -81,7 +84,8 @@ export function emptyDeploymentRecord(network: NetworkName): DeploymentRecord {
 }
 
 const isHex32 = (value: unknown): value is Hex => typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value);
-const CONTRACTS: ContractName[] = ["priceFeedType", "publisherSetType"];
+const CONTRACTS: ContractName[] = ["priceFeedType", "publisherSetType", "alwaysSuccessLock"];
+const OPTIONAL: ContractName[] = ["alwaysSuccessLock"];
 
 function checkCode(c: CodeRef | undefined, name: string): CodeRef {
   if (!c || !isHex32(c.codeHash) || c.hashType !== "data2" || !isHex32(c.cellDep?.outPoint?.txHash)) {
@@ -97,10 +101,11 @@ function checkCode(c: CodeRef | undefined, name: string): CodeRef {
 export function parseDeployment(value: unknown): LeanOracleDeployment {
   const raw = value as { network?: NetworkName; contracts?: Record<string, unknown>; committees?: Record<string, CommitteeRef> };
   if (!raw || !["devnet", "testnet", "mainnet"].includes(raw.network ?? "")) throw new TypeError("deployment: invalid network");
-  const contracts = {} as Record<ContractName, CodeRef>;
+  const contracts = {} as LeanOracleDeployment["contracts"];
   const contractVersions = {} as Record<ContractName, Record<number, CodeRef>>;
   for (const name of CONTRACTS) {
     const entry = raw.contracts?.[name] as { current?: number; versions?: Record<string, CodeVersionRecord> } | CodeRef | undefined;
+    if (!entry && OPTIONAL.includes(name)) continue;
     if (entry && "versions" in entry && entry.versions) {
       const versions: Record<number, CodeRef> = {};
       for (const [n, v] of Object.entries(entry.versions)) {
@@ -112,8 +117,9 @@ export function parseDeployment(value: unknown): LeanOracleDeployment {
       contracts[name] = current;
       contractVersions[name] = versions;
     } else {
-      contracts[name] = checkCode(entry as CodeRef | undefined, `contracts.${name}`);
-      contractVersions[name] = { [contracts[name].version ?? 1]: contracts[name] };
+      const code = checkCode(entry as CodeRef | undefined, `contracts.${name}`);
+      contracts[name] = code;
+      contractVersions[name] = { [code.version ?? 1]: code };
     }
   }
   const committees: Record<string, CommitteeRef> = {};
@@ -127,8 +133,14 @@ export function parseDeployment(value: unknown): LeanOracleDeployment {
 
 /** The version of `contract` whose code hash is `codeHash` (cells keep the code they were created with). */
 export function codeRefFor(deployment: LeanOracleDeployment, contract: ContractName, codeHash: Hex): CodeRef {
-  const all = deployment.contractVersions?.[contract] ?? { 0: deployment.contracts[contract] };
-  const found = Object.values(all).find((c) => c.codeHash.toLowerCase() === codeHash.toLowerCase());
+  const found = findCodeRef(deployment, contract, codeHash);
   if (!found) throw new Error(`${contract} code ${codeHash} is not in this deployment`);
   return found;
+}
+
+/** Like `codeRefFor`, but undefined when no version of `contract` has `codeHash`. */
+export function findCodeRef(deployment: LeanOracleDeployment, contract: ContractName, codeHash: Hex): CodeRef | undefined {
+  const current = deployment.contracts[contract];
+  const all = deployment.contractVersions?.[contract] ?? (current ? { 0: current } : {});
+  return Object.values(all).find((c) => c.codeHash.toLowerCase() === codeHash.toLowerCase());
 }

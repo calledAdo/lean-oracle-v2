@@ -20,6 +20,9 @@ current testnet deployment until it is redeployed.
   `LeanOracleClient.isFeedPriceTrusted`.
 - `verifyPriceUpdate` accepts the previous set for ticks before its switch.
 - Magics `LOPU` (update) and `LOOB` (observation).
+- Deployments carry an optional `alwaysSuccessLock`; `bootstrapCommittee` puts new committee cells
+  under it by default (no key can block governance) and `governCommittee` adds its cell dep.
+  `findCodeRef` looks up a contract version by code hash without throwing.
 
 ## 1.0.0
 

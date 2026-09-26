@@ -53,8 +53,11 @@ impl Env {
         let binary = std::fs::read("../target/riscv64imac-unknown-none-elf/release/publisher_set_type")
             .expect("build contracts first: cargo build --release");
         let code = context.deploy_cell(binary.into());
-        let always = context.deploy_cell(Bytes::from(ckb_testtool::builtin::ALWAYS_SUCCESS.to_vec()));
-        let lock = context.build_script(&always, Bytes::new()).unwrap();
+        // The committee lock actually deployed (contracts/always_success_lock).
+        let always_bin = std::fs::read("../target/riscv64imac-unknown-none-elf/release/always_success_lock")
+            .expect("build contracts first: cargo build --release");
+        let always = context.deploy_cell(always_bin.into());
+        let lock = context.build_script_with_hash_type(&always, ScriptHashType::Data2, Bytes::new()).unwrap();
         let committee_type = context.build_script_with_hash_type(&code, ScriptHashType::Data2, Bytes::from(vec![0x7e; 32])).unwrap();
         let committee_hash = committee_type.calc_script_hash().unpack();
         Self { context, code, always, lock, committee_type, committee_hash }
@@ -309,7 +312,7 @@ fn guards_keep_the_cell_its_lock_and_its_capacity() {
     let tx = env.op_tx(&old.data, vec![(env.output(CAPACITY - 1), paused.clone())], 0, w.clone());
     assert_code(env.verify(&tx), ERROR_PUBLISHER_SET_CELL);
     // Lock swapped.
-    let other_lock = env.context.build_script(&env.always, Bytes::from_static(b"thief")).unwrap();
+    let other_lock = env.context.build_script_with_hash_type(&env.always, ScriptHashType::Data2, Bytes::from_static(b"thief")).unwrap();
     let moved = CellOutput::new_builder().capacity(CAPACITY).lock(other_lock).type_(Some(env.committee_type.clone()).pack()).build();
     let tx = env.op_tx(&old.data, vec![(moved, paused.clone())], 0, w.clone());
     assert_code(env.verify(&tx), ERROR_CONFIG_MUTATED);

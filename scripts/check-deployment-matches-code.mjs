@@ -15,7 +15,7 @@ const built = Object.fromEntries(
     .map((line) => line.split(/\s+/))
     .map(([name, hash]) => [name, hash.toLowerCase()]),
 );
-const pairs = { priceFeedType: "price_feed_type", publisherSetType: "publisher_set_type" };
+const pairs = { priceFeedType: "price_feed_type", publisherSetType: "publisher_set_type", alwaysSuccessLock: "always_success_lock" };
 let ok = true;
 for (const [contract, binary] of Object.entries(pairs)) {
   const entry = record.contracts?.[contract];

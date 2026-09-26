@@ -14,7 +14,7 @@ import { bootstrapCommittee, completeFee, DEFAULT_MIN_ROTATION_INTERVAL_S, gover
 
 import { loadConfig, REPO_ROOT, type Context } from "./context.js";
 
-const CONTRACTS: ContractName[] = ["priceFeedType", "publisherSetType"];
+const CONTRACTS: ContractName[] = ["priceFeedType", "publisherSetType", "alwaysSuccessLock"];
 const ckb = (shannons: bigint) => `${ccc.fixedPointToString(shannons)} CKB`;
 const now = () => new Date().toISOString();
 export const log = (event: string, detail: Record<string, unknown> = {}) =>
@@ -59,7 +59,7 @@ function canonicalHashes(): Map<string, Hex> {
   return new Map(lines.map((l) => l.split(" ") as [string, Hex]).map(([name, hash]) => [name, hash]));
 }
 
-const BINARY_NAMES: Record<ContractName, string> = { priceFeedType: "price_feed_type", publisherSetType: "publisher_set_type" };
+const BINARY_NAMES: Record<ContractName, string> = { priceFeedType: "price_feed_type", publisherSetType: "publisher_set_type", alwaysSuccessLock: "always_success_lock" };
 
 /** Build, then deploy each contract whose binary differs from the current version (appends a version). */
 export async function deployCode(ctx: Context, options: { build?: boolean } = {}): Promise<void> {
@@ -251,6 +251,8 @@ export async function validate(network: string, target: string, name: string | u
     if (target === "deploy:committee" || target === "govern:committee") {
       const record: DeploymentRecord = ctx.record.read();
       check(Boolean(record.contracts.priceFeedType && record.contracts.publisherSetType), "contracts deployed");
+      // New committee cells get the always-success lock, so no key can block governance.
+      if (target === "deploy:committee") check(Boolean(record.contracts.alwaysSuccessLock), "alwaysSuccessLock deployed");
       if (name) {
         const intent = ctx.config.committees[name];
         check(Boolean(intent), `committee ${name} in config`);

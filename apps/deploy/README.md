@@ -41,7 +41,9 @@ npm run show -w lean-oracle-deploy -- --network testnet
 ```
 
 - `deploy:code` builds the contracts first (`--skip-build` to reuse), then deploys only the
-  contracts whose binary differs from the current live version.
+  contracts whose binary differs from the current live version: `priceFeedType`, `publisherSetType`
+  and `alwaysSuccessLock`. `deploy:committee` needs `alwaysSuccessLock` and creates the committee
+  cell under it, so no key owns the committee.
 - `deploy:committee` creates a committee from `config.committees[name]` (1–9 keys; quorum
   `floor(2n/3)+1`; `networkId` defaults to the chain's genesis hash; `minRotationIntervalS` defaults
   to 86400). A committee is created once; change it with `govern:committee`.

@@ -4,6 +4,7 @@ members = [
   "contracts/common",
   "contracts/publisher_set_type",
   "contracts/price_feed_type",
+  "contracts/always_success_lock",
   "examples/price_trigger_lock",
   "tests",
 ]
@@ -12,6 +13,7 @@ default-members = [
   "contracts/common",
   "contracts/publisher_set_type",
   "contracts/price_feed_type",
+  "contracts/always_success_lock",
   "examples/price_trigger_lock",
 ]
 

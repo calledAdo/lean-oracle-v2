@@ -87,7 +87,10 @@ before(async () => {
   state.committee = { typeScript, typeHash, keys, data };
   const { findCommitteeCell } = await import("lean-oracle-sdk/ckb");
   state.committeeCellDep = () => state.currentCommitteeDep;
-  state.currentCommitteeDep = (await findCommitteeCell(client, typeScript)).cellDep;
+  const committeeCell = await findCommitteeCell(client, typeScript);
+  state.currentCommitteeDep = committeeCell.cellDep;
+  // No key owns the committee: it sits under the deployment's always-success lock.
+  assert.equal(committeeCell.cell.cellOutput.lock.codeHash, base.contracts.alwaysSuccessLock.codeHash);
 
   const out = mkdtempSync(join(tmpdir(), "lean-e2e-"));
   execFileSync("node", [

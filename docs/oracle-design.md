@@ -112,8 +112,9 @@ committee with identical keys.
 - While paused, feed cells reject every update, and consumers treat stored prices as unusable
   (section 9).
 - The cell keeps its lock and never loses capacity, and it cannot be destroyed, so it is created
-  under an always-success lock: anyone may submit a quorum-approved operation and no key can block
-  governance.
+  under an always-success lock (`contracts/always_success_lock`, deployed with the other contracts):
+  anyone may submit a quorum-approved operation and no key can block governance. Never send plain
+  CKB to that lock; anyone can take it.
 - **Limit.** If a quorum of the current keys is stolen, the thief is the committee: no rule inside it
   can recover. Recovery is a new committee cell, and integrators re-pin its type hash. `ROTATE_REVOKE`,
   `REVOKE_PREVIOUS` and pause cover the cases below that line (a minority of keys, or retired keys

@@ -6,7 +6,7 @@ import { ccc } from "@ckb-ccc/core";
 import { findCommitteeCell } from "../ckb/cells.js";
 import { publisherSetTypeScript } from "../ckb/scripts.js";
 import { computeTypeId } from "../ckb/typeId.js";
-import { codeRefFor, type LeanOracleDeployment } from "../presets/deployment.js";
+import { codeRefFor, findCodeRef, type LeanOracleDeployment } from "../presets/deployment.js";
 import { MAX_UNTIL_AHEAD_MS, SINCE_RELATIVE_TIMESTAMP, SINCE_VALUE_MASK } from "../protocol/constants.js";
 import {
   encodePublisherSetData,
@@ -36,9 +36,9 @@ export interface BootstrapCommitteeParams {
   /** Initial committee: `governanceNonce` 0, `setIndex` 0, no previous set. */
   data: PublisherSetData;
   /**
-   * Lock of the committee cell (default: the signer's own lock, whose key must then co-sign every
-   * governance transaction and could block it). Pass an always-success lock so no key can block
-   * governance; the committee type script keeps the cell and its capacity safe either way.
+   * Lock of the committee cell. Default: the deployment's `alwaysSuccessLock`, so no key can block
+   * governance (the committee type script keeps the cell and its capacity safe); without one, the
+   * signer's own lock, whose key must then co-sign every governance transaction and could block it.
    */
   lock?: Script;
 }
@@ -47,7 +47,8 @@ export async function bootstrapCommittee(p: BootstrapCommitteeParams): Promise<{
   if (p.data.governanceNonce !== 0n || p.data.current.setIndex !== 0 || p.data.previous || !isValidPublisherSetData(p.data)) {
     throw new Error("a new committee needs nonce 0, set index 0, no previous set, a positive rotation interval and a valid key set");
   }
-  const lock = p.lock ?? ((await p.signer.getRecommendedAddressObj()).script as unknown as Script);
+  const open = p.deployment.contracts.alwaysSuccessLock;
+  const lock = p.lock ?? (open ? { codeHash: open.codeHash, hashType: "data2" as const, args: "0x" as Hex } : ((await p.signer.getRecommendedAddressObj()).script as unknown as Script));
   const firstInput = await plainInputOf(p.signer);
   const typeScript = publisherSetTypeScript(p.deployment, computeTypeId(firstInput, 0));
   const dataHex = ccc.hexFrom(encodePublisherSetData(p.data)) as Hex;
@@ -104,6 +105,9 @@ export async function governCommittee(p: GovernCommitteeParams): Promise<ccc.Tra
   }
   // The committee keeps the contract version it was created under.
   tx.addCellDeps(cellDep(codeRefFor(p.deployment, "publisherSetType", live.cell.cellOutput.type!.codeHash as Hex).cellDep));
+  // An always-success committee lock runs too, so its code is a dep; any other lock is the signer's to unlock.
+  const openLock = findCodeRef(p.deployment, "alwaysSuccessLock", live.cell.cellOutput.lock.codeHash as Hex);
+  if (openLock) tx.addCellDeps(cellDep(openLock.cellDep));
   const pop = p.proofOfPossession ? encodeSignatureBundle(p.proofOfPossession) : new Uint8Array();
   setInputType(tx, 0, concatBytes(Uint8Array.of(p.operation), encodeSignatureBundle(p.authorization), pop));
   return tx;

@@ -94,6 +94,25 @@
           "deployedAt": "2026-09-26T20:13:57.233Z"
         }
       }
+    },
+    "alwaysSuccessLock": {
+      "current": 1,
+      "versions": {
+        "1": {
+          "codeHash": "0x2a2e548b4f39e77ef743b0492b98f0d9714fbad789a4b484248311b5402b5ca9",
+          "hashType": "data2",
+          "cellDep": {
+            "outPoint": {
+              "txHash": "0xbfbb433ab22c089d6d8e9049020eb6e8f0d976ad7af7fc6db9c6236aec0a2eb8",
+              "index": 0
+            },
+            "depType": "code"
+          },
+          "bytes": 1104,
+          "capacity": "116500000000",
+          "deployedAt": "2026-09-26T21:10:26.594Z"
+        }
+      }
     }
   },
   "committees": {
@@ -180,6 +199,16 @@
         "contract": "publisherSetType",
         "version": 3,
         "codeHash": "0xe8eaf1bd1db480480b1a48513d8a4508901ca392dd7acd1fc9c8e2bb62f3d636"
+      }
+    },
+    {
+      "action": "deploy:code",
+      "txHash": "0xbfbb433ab22c089d6d8e9049020eb6e8f0d976ad7af7fc6db9c6236aec0a2eb8",
+      "at": "2026-09-26T21:10:26.594Z",
+      "detail": {
+        "contract": "alwaysSuccessLock",
+        "version": 1,
+        "codeHash": "0x2a2e548b4f39e77ef743b0492b98f0d9714fbad789a4b484248311b5402b5ca9"
       }
     }
   ]

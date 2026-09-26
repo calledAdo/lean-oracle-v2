@@ -20,3 +20,6 @@ pub const ERROR_UPDATE_PROOF: i8 = 88;
 pub const ERROR_UPDATE_SET: i8 = 89;
 pub const ERROR_UPDATE_SIGNATURE: i8 = 90;
 pub const ERROR_UPDATE_MISMATCH: i8 = 91;
+pub const ERROR_PUBLISHER_SET_INTERVAL: i8 = 65;
+pub const ERROR_PUBLISHER_SET_CELL: i8 = 66;
+pub const ERROR_FEED_LEADER: i8 = 92;

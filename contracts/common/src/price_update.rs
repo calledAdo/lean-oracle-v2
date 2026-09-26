@@ -7,7 +7,7 @@ use crate::protocol_hash::{ckb_hash, DOMAIN_PRICE_LEAF, DOMAIN_PRICE_NODE, DOMAI
 use crate::publisher_set::{PublisherSetData, GOVERNANCE_PAUSED};
 use crate::signatures::SignatureBundle;
 
-pub const PRICE_UPDATE_MAGIC: &[u8; 4] = b"TPOU";
+pub const PRICE_UPDATE_MAGIC: &[u8; 4] = b"LOPU";
 pub const PRICE_UPDATE_VERSION: u8 = 1;
 pub const HEADER_LEN: usize = 119;
 pub const MESSAGE_LEN: usize = 86;
@@ -235,15 +235,31 @@ pub struct VerifiedPrice {
     pub message: PriceMessage,
 }
 
-/// Verify one feed's price inside an update blob against the committee cell's current data.
-/// Current-set-only: only updates signed by the active set index are accepted.
-pub fn verify_price_update(
-    blob: &[u8],
-    feed_id: &[u8; 32],
+/// The committee's signatures over `header`: the header names this committee, the committee is not
+/// paused, and a quorum of the set that was valid for the header's tick signed it (the current set,
+/// or the previous set for ticks before its switch).
+pub fn verify_header(
+    header: &PriceUpdateHeader,
+    signatures: &SignatureBundle,
     publisher_set_type_hash: &[u8; 32],
     publisher_set: &PublisherSetData,
-) -> Result<VerifiedPrice, VerifyError> {
-    let update = PriceUpdateBlob::from_bytes(blob).ok_or(VerifyError::Malformed)?;
+) -> Result<(), VerifyError> {
+    if &header.publisher_set_type_hash != publisher_set_type_hash {
+        return Err(VerifyError::PublisherSet);
+    }
+    if publisher_set.governance_flags & GOVERNANCE_PAUSED != 0 {
+        return Err(VerifyError::Paused);
+    }
+    let set = publisher_set.set_for(header.set_index, header.publish_time_ms).ok_or(VerifyError::SetIndex)?;
+    if !signatures.verify_threshold(&header.signing_hash(), set) {
+        return Err(VerifyError::Signature);
+    }
+    Ok(())
+}
+
+/// The one entry for `feed_id` in `update`, with a valid Merkle proof against the header's root.
+/// Signatures are not checked here.
+pub fn find_entry(update: &PriceUpdateBlob, feed_id: &[u8; 32]) -> Result<PriceMessage, VerifyError> {
     let mut found: Option<&UpdateEntry> = None;
     for entry in &update.entries {
         if entry.message_bytes[1..33] == feed_id[..] {
@@ -258,18 +274,20 @@ pub fn verify_price_update(
     if !verify_proof(&update.header.merkle_root, leaf_hash(&entry.message_bytes), &entry.proof) {
         return Err(VerifyError::Proof);
     }
-    if &update.header.publisher_set_type_hash != publisher_set_type_hash {
-        return Err(VerifyError::PublisherSet);
-    }
-    if publisher_set.governance_flags & GOVERNANCE_PAUSED != 0 {
-        return Err(VerifyError::Paused);
-    }
-    let set = publisher_set
-        .active_set(update.header.set_index)
-        .ok_or(VerifyError::SetIndex)?;
-    if !update.signatures.verify_threshold(&update.header.signing_hash(), set) {
-        return Err(VerifyError::Signature);
-    }
+    Ok(message)
+}
+
+/// Verify one feed's price inside an update blob against the committee cell's current data:
+/// the entry and its proof, then the committee's signatures over the header.
+pub fn verify_price_update(
+    blob: &[u8],
+    feed_id: &[u8; 32],
+    publisher_set_type_hash: &[u8; 32],
+    publisher_set: &PublisherSetData,
+) -> Result<VerifiedPrice, VerifyError> {
+    let update = PriceUpdateBlob::from_bytes(blob).ok_or(VerifyError::Malformed)?;
+    let message = find_entry(&update, feed_id)?;
+    verify_header(&update.header, &update.signatures, publisher_set_type_hash, publisher_set)?;
     Ok(VerifiedPrice { header: update.header, message })
 }
 

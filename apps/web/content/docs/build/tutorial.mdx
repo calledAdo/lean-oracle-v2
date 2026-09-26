@@ -34,13 +34,22 @@ The release path reads the feed cell from the cell deps and checks it with the c
 
 ```rust
 use lean_oracle_common::consumer::{check_feed_cell, price_at_expo, published_after};
+use lean_oracle_common::publisher_set::PublisherSetData;
 
-// 1. The pinned feed cell: right feed, right committee, carries a verified price.
+// 1. The pinned feed cell: right feed, right committee, a verified price the committee still backs.
 let index = QueryIter::new(load_cell_type_hash, Source::CellDep)
     .position(|hash| hash == Some(args.feed_type_hash))
     .ok_or(ERROR_FEED_DEP_MISSING)?;
 let data = load_cell_data(index, Source::CellDep).map_err(|_| ERROR_FEED_DEP_MISSING)?;
-let feed = check_feed_cell(&data, &args.feed_id, &args.committee).map_err(to_error)?;
+// The committee cell is a cell dep too: a pause or a revoked key set must reach this price.
+let committee_index = QueryIter::new(load_cell_type_hash, Source::CellDep)
+    .position(|hash| hash == Some(args.committee))
+    .ok_or(ERROR_COMMITTEE_DEP)?;
+let committee = load_cell_data(committee_index, Source::CellDep)
+    .ok()
+    .and_then(|bytes| PublisherSetData::from_bytes(&bytes))
+    .ok_or(ERROR_COMMITTEE_DEP)?;
+let feed = check_feed_cell(&data, &args.feed_id, &args.committee, &committee).map_err(to_error)?;
 
 // 2. Fresh enough: published after every locked cell was created. Scripts cannot read
 //    the current time, so the block header of each input (a header dep) provides one.

@@ -1,7 +1,7 @@
 # Threshold Price Oracle — Design
 
-Status: **final (2026-09-24)**. This is the first version of the protocol; nothing has been
-deployed before it.
+Status: **v1 contract freeze (2026-09-26)**, superseding the 2026-09-24 draft. Decisions and their
+reasons: [designs/v1-contract-freeze.md](designs/v1-contract-freeze.md).
 
 ## 1. Summary
 
@@ -29,8 +29,10 @@ A **pull oracle** for any CKB project, modelled on Pyth + Hermes and on the on-c
 2. **Mirror lean-oracle on-chain.** It uses the same create/update/burn shapes, the same
    zeroed-at-creation rule, and strictly increasing timestamps. Unlike lean-oracle, every cell
    is Type ID-unique and there is no shared public cell or bind lock.
-3. **Current-set-only.** Only updates signed by the active PublisherSet are accepted. A retired
-   set can never authorize anything, including history.
+3. **Current set, plus a bounded previous set.** Updates signed by the active PublisherSet are
+   accepted. After a routine rotation the previous set still verifies ticks **before** the switch,
+   so settlement at exact times survives rotations; the committee can revoke it at any time, and an
+   emergency rotation drops it at once. Older sets never authorize anything.
 4. **No trusted gateway.** Signed updates are self-verifying. Mirrors, CDNs and caches are
    untrusted transport.
 
@@ -78,6 +80,36 @@ To change it:
 
 Every signed update carries the active config's hash (`config_hash`, section 6.1), and mirrors
 publish every approved config with its signatures.
+
+### 3.2 Governance (committee cell)
+
+The committee cell holds its keys, a `governance_nonce`, flags (`PAUSED`, `LOCKED`), a per-committee
+`min_rotation_interval_s` (set at creation, default 24 h) and, after a routine rotation, the previous
+set with `previous_until_ms` (the first tick of the current set). Every change is one operation,
+authorized by a quorum of the **current** set over
+`ckb_hash("LEAN/PUBLISHER_SET_UPDATE/V2" || committee type hash || op || old state hash || new state hash)`.
+The committee type hash binds the approval to one cell, so it cannot be replayed on another
+committee with identical keys.
+
+| Operation | Effect | Extra requirements |
+|---|---|---|
+| `ROTATE` (1) | next set index; the outgoing set becomes `previous` until the new set's first tick | proof of possession from every new key; the committee cell is at least `min_rotation_interval_s` old (relative timestamp `since`) |
+| `ROTATE_REVOKE` (2) | next set index; no previous set (emergency) | proof of possession; **no** interval |
+| `PAUSE` (3) / `UNPAUSE` (4) | set / clear `PAUSED` | none |
+| `REVOKE_PREVIOUS` (5) | drop the previous set at any time (e.g. retired keys leaked later) | none |
+
+- The interval exists so that at most one previous set is ever kept. The chain measures it with block
+  median time, which trails the wall clock by a minute or more, so a rotation may be refused as
+  "immature" for a short while after the interval; retry.
+- While paused, feed cells reject every update, and consumers treat stored prices as unusable
+  (section 9).
+- The cell keeps its lock and never loses capacity, and it cannot be destroyed, so it is created
+  under an always-success lock: anyone may submit a quorum-approved operation and no key can block
+  governance.
+- **Limit.** If a quorum of the current keys is stolen, the thief is the committee: no rule inside it
+  can recover. Recovery is a new committee cell, and integrators re-pin its type hash. `ROTATE_REVOKE`,
+  `REVOKE_PREVIOUS` and pause cover the cases below that line (a minority of keys, or retired keys
+  that leak after a rotation).
 
 Changes need no transaction or deployment:
 - **Adding a feed:** a new Merkle leaf. Existing IDs and proofs are unaffected.
@@ -172,10 +204,12 @@ The rule to guarantee: **at most one valid update exists per (committee, tick)**
 - Publishers are ordered by `ckb_hash("LEAN/LEADER_ORDER/V1" || t || anchor header hash || index)`.
 - Ranks `0..f` (`f = n − quorum`) may propose. The order is unpredictable until about two ticks
   ahead, and every synced publisher computes it identically.
+- A backup always asks its peers first, even when it already holds every observation: only
+  re-proposing a header that peers already signed can still finalize the tick.
 
 **Per tick:**
 1. **Observe.** At `t` each publisher signs an observation (`LEAN/OBSERVATION/V1`) and sends it to
-   **every** publisher. Layout (little-endian): `magic "TPOB" | version u8 |
+   **every** publisher. Layout (little-endian): `magic "LOOB" | version u8 |
    publisher_set_type_hash [32] | set_index u32 | tick_ms u64 | config_hash [32] | publisher_index u8 |
    entry_count u8 | entries`, each entry `feed_id [32] | price i64 | conf u64 | source_time_ms u64`,
    strictly ascending by feed id; the 65-byte signature follows.
@@ -231,13 +265,13 @@ Every hashed or signed structure is domain-separated with a `LEAN/<NAME>/V<n>` t
 `LEAN/FEED/V1`, `LEAN/PRICE_UPDATE/V1`, `LEAN/PRICE_LEAF/V1`, `LEAN/PRICE_NODE/V1`,
 `LEAN/OBSERVATION/V1`, `LEAN/COMMITTEE_CONFIG/V1`, `LEAN/PROPOSAL/V1`, `LEAN/LEADER_ORDER/V1`,
 `LEAN/PEER_HELLO/V1` (publisher connection authentication),
-`LEAN/PUBLISHER_SET_STATE/V1`, `LEAN/PUBLISHER_SET_UPDATE/V1`, `LEAN/PUBLISHER_SET_POP/V1`.
+`LEAN/PUBLISHER_SET_STATE/V2`, `LEAN/PUBLISHER_SET_UPDATE/V2`, `LEAN/PUBLISHER_SET_POP/V2`.
 
 ### 6.1 Header (119 bytes, signed)
 
 | Offset | Field | Type |
 |---|---|---|
-| 0 | magic `"TPOU"` | [u8; 4] |
+| 0 | magic `"LOPU"` | [u8; 4] |
 | 4 | version = 1 | u8 |
 | 5 | publisher_set_type_hash | [u8; 32] |
 | 37 | set_index | u32 |
@@ -283,7 +317,7 @@ header (119) | SignatureBundle | entry_count u8 | entry_count × { leaf (86) | p
 ```
 
 One blob may carry any subset of the tick's feeds. The witness wrapper mirrors lean-oracle:
-`update_len u32 | update blob`, in `WitnessArgs.input_type` of the feed cell's group input 0.
+`update_len u32 | update blob`, in `WitnessArgs.input_type` of the **leader** feed input (section 7.2).
 
 ## 7. On-chain: `price_feed_type` (mirrors lean-oracle `oracle_script`)
 
@@ -292,7 +326,7 @@ u64 LE)` is checked at creation (the same rule as `publisher_set_type`'s `valida
 No two cells can ever share a type hash, so a consumer pins exactly one cell by its type hash. A
 burned cell's identity can never be recreated, which rules out rolling back its timestamps.
 
-### 7.1 Cell data (125 bytes)
+### 7.1 Cell data (129 bytes)
 
 | Offset | Field | Type |
 |---|---|---|
@@ -307,6 +341,7 @@ burned cell's identity can never be recreated, which rules out rolling back its 
 | 108 | ema_conf | u64 |
 | 116 | source_time_ms | u64 |
 | 124 | num_publishers | u8 |
+| 125 | set_index (key set that signed the stored price) | u32 |
 
 `publish_time_ms` is the committee-signed time of the price currently stored. That is the "last
 updated" timestamp. A consumer that also wants the on-chain inclusion time can load the header
@@ -324,14 +359,18 @@ of the block that created the cell.
   1. Decode old and new data. `new.feed_id == args[0..32]`. `feed_id` and `publisher_set_type_hash`
      are unchanged.
   2. `new.publish_time_ms > old.publish_time_ms` (strict: forward only).
-  3. Parse the witness blob. Exactly one entry has `leaf.feed_id == feed_id`, and its Merkle
-     proof verifies against `header.merkle_root`.
-  4. `header.publisher_set_type_hash == new.publisher_set_type_hash`.
-  5. Load the unique PublisherSet cell dep. It must not be `GOVERNANCE_PAUSED`, and
-     `header.set_index` must equal the current `set_index`.
-  6. `SignatureBundle.verify_threshold(signing_hash(header), current_set)`.
-  7. The output must equal the authenticated message exactly: the leaf fields, plus
-     `publish_time_ms = header.publish_time_ms`.
+  3. Find the **leader**: the lowest-index input whose type script has this code, whose data names
+     the same committee, and which continues as an output (an update, not a burn). Its witness
+     carries the only update blob for this committee in the transaction.
+  4. Exactly one entry of that blob has `leaf.feed_id == feed_id`, and its Merkle proof verifies
+     against `header.merkle_root`. `header.publisher_set_type_hash == new.publisher_set_type_hash`.
+  5. The leader alone loads the unique PublisherSet cell dep and checks the signatures: not
+     `PAUSED`, and `SignatureBundle.verify_threshold(signing_hash(header), set)` where `set` is the
+     current set, or the previous set if `header.set_index` names it and
+     `header.publish_time_ms < previous_until_ms`. If the leader fails, the whole transaction fails,
+     so other feed cells rely on it and only prove their own leaf.
+  6. The output must equal the authenticated message exactly: the leaf fields,
+     `publish_time_ms = header.publish_time_ms` and `set_index = header.set_index`.
 - **Burn (1 → 0).** Always allowed by the type script; the lock decides.
 
 ### 7.3 Lock
@@ -344,9 +383,10 @@ authentic and forward-only, whatever the lock.
 ### 7.4 Cost
 
 Measured with `ckb-testtool` (full `price_feed_type` update, including parsing, Merkle proof
-and PublisherSet load): **24.1M cycles at quorum 3 of 4** and **55.9M cycles at quorum 7 of 9**.
-That is about 8M cycles per signature. Updating k feeds in one transaction re-verifies the signatures k times, as lean-oracle
-does today. A shared verification cell is a possible later optimization.
+and PublisherSet load): **22.6M cycles at quorum 3 of 4** and **52.5M cycles at quorum 7 of 9**,
+about 7.5M cycles per signature. Feed cells of one committee moved in one transaction share one
+signature check: 1, 2 and 3 feeds cost 22.58M, 22.71M and 22.85M cycles (about 0.14M per extra
+feed). A committee rotation costs 52.5M cycles with 4 keys and 120M with 9.
 
 ## 8. Mirror API (Hermes equivalent)
 
@@ -359,8 +399,9 @@ publishers and consumers. Publishers stay on a private network and serve only th
 
 Every update is verified before it is stored: committee type hash, known set index, a quorum of
 signatures, `leaf_count` entries each with a valid Merkle proof. The committee cell is re-read from
-the chain every 30 s. A set that has been rotated out is accepted only for ticks before the mirror
-first saw the newer set.
+the chain every 30 s. The previous set is accepted only for ticks before `previous_until_ms`, as on
+chain (a mirror started after a rotation learns it from the cell); a revoked set is not accepted for
+anything new, while history already stored stays served.
 
 **Identity and equivocation.** An update is identified by its header hash; publishers may hold the
 same update with different quorum subsets of signatures, which are duplicates. A second valid header
@@ -394,7 +435,9 @@ bursts of 20, 2 streams per anonymous client. Unknown keys get 401, exhausted bu
 `Retry-After`. `/health` is not limited. Heavy users should run their own mirror: it needs no
 trust, only publisher URLs and the committee cell.
 
-Full history is retained (about 50 MB/day per committee at 1 s ticks). Not yet built: serving
+Full history is retained. Measured on testnet: about 0.4 GB/day for a 10-feed committee at 1 s
+ticks in each publisher store, and about 0.8 GB/day in the mirror for two committees; plan disk or
+retention accordingly. Not yet built: serving
 approved committee configs (`/v1/configs`).
 
 ## 9. Consumer guidance
@@ -406,6 +449,10 @@ approved committee configs (`/v1/configs`).
   concurrent users can create several cells for the same feed, or verify updates inside its own
   transactions.
 - **Authenticity check.** `publish_time_ms != 0`.
+- **Is the committee still behind this price?** Load the committee cell as a cell dep too: reject when
+  it is `PAUSED`, or when the cell's `set_index` is neither the current set nor a non-revoked previous
+  set. This is how a pause or a revocation reaches prices already written into cells. A cell whose
+  price was signed two routine rotations ago is no longer trusted: move it forward.
 - **Freshness is yours.** CKB scripts cannot read the current time. Useful patterns:
   - compare `publish_time_ms` against a header dep's timestamp (proves an update is *not
     from the future*);
@@ -420,7 +467,9 @@ approved committee configs (`/v1/configs`).
   Both work only while the signing set is still current. How and when to snapshot is the
   consumer's decision.
 - **Helpers.** `lean_oracle_common::consumer` decodes and checks a feed cell (feed, committee,
-  authenticity), checks freshness against a provable time, and rescales exponents. The reference
+  authenticity, pause and key-set trust against the committee cell), checks freshness against a
+  provable time, and rescales exponents. The SDK has `isFeedPriceTrusted` and, to move several feed
+  cells of one committee at once, `updateFeedCells`. The reference
   consumer [`examples/price_trigger_lock`](../examples/price_trigger_lock/src/main.rs) uses them:
   about 38,000 cycles to read and check a price.
 - **In-transaction verification.** `lean-oracle-common` exports
@@ -430,7 +479,7 @@ approved committee configs (`/v1/configs`).
 
 | Component | Role |
 |---|---|
-| `contracts/publisher_set_type` | Committee cell: publisher keys, derived quorum `floor(2n/3)+1`, quorum-authorized rotation with proof of possession. |
+| `contracts/publisher_set_type` | Committee cell: publisher keys, derived quorum `floor(2n/3)+1`, the five governance operations of section 3.2. |
 | `contracts/price_feed_type` | Feed cells (section 7). |
 | `contracts/common` (`lean-oracle-common`) | Shared codecs, Merkle, `verify_price_update`; usable by consumer scripts. |
 | `apps/publisher` | Publisher service (Docker image): recorder, observer, rotating leader, signer. |
@@ -478,4 +527,7 @@ new set. The devnet end-to-end test (`apps/deploy/tests`) exercises the whole pa
 | Publishers | n ≤ 9 hard cap, no minimum; launch with available operators |
 | Methodology | Section 4: liveness-based freshness, 100 ms mid sampling, dust filter, outlier pass, native pairs without conversion, config rules (minVenues ≥ 2, one spare market, one market per venue), even-count median = floor mean of middle two; EMA from finalized history |
 | Protocol | Section 5: observations and signatures to all, signed proposals naming observations by hash, anchor-seeded leader order with backup slots and re-propose rule, local finalization, authenticated binary transport |
+| Governance (2026-09-26) | Section 3.2: five quorum operations bound to the committee cell; routine rotation keeps the previous set until the switch tick and waits a per-committee interval (relative `since`, default 24 h); emergency rotation and revoke-previous drop it at once; quorum pause/unpause; always-success committee lock with cell guards; quorum compromise is recovered by a new committee |
+| Feed cells (2026-09-26) | 129 bytes with `set_index`; one signature check per committee per transaction (leader/follower, one shared blob); consumers check pause and key-set trust through the committee cell |
+| Formats (2026-09-26) | Magics `LOPU` (update) and `LOOB` (observation); PublisherSet v2 domains `/V2` |
 | Up/down pools | Keeper-owned lane feed cell, exact-tick settlement |

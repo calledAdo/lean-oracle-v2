@@ -12,7 +12,8 @@ applications, much like Pyth's Hermes.
   with a backfill on start, on reconnect and every minute.
 - **Verifies** each update before storing it: committee, set index, quorum signatures and every
   Merkle proof. It re-reads the committee cell from CKB every 30 seconds.
-- **Keeps full history**, about 50 MB per committee per day at one-second ticks.
+- **Keeps full history**, which grows quickly: about 0.4 GB per day for a 10-feed committee at
+  one-second ticks.
 - **Serves** the [Mirror API](/docs/reference/mirror-api) over HTTP and WebSocket, with rate limits.
 
 ## Why you don't have to trust it

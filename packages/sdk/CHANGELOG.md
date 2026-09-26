@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0 (unreleased)
+
+Contract freeze formats (docs/designs/v1-contract-freeze.md). Not compatible with 1.x or with the
+current testnet deployment until it is redeployed.
+
+- Committee cell v2: `minRotationIntervalS`, optional `previous` set with `untilMs`; operations
+  `OP_ROTATE`, `OP_ROTATE_REVOKE`, `OP_PAUSE`, `OP_UNPAUSE`, `OP_REVOKE_PREVIOUS`; `transitionError`.
+- Governance digests take the committee type hash: `publisherSetUpdateHash(current, next, op, committee)`,
+  `publisherSetPopHash(next, committee)`, `signGovernance` (replaces `signRotation`),
+  `signProofOfPossession(next, committee, key, index)`.
+- `governCommittee` replaces `rotateCommittee` and covers every operation (a routine rotation sets
+  the relative `since` for the committee's interval).
+- `updateFeedCells`: several feed cells of one committee in one transaction, one signature check.
+- Feed cell data is 129 bytes (`setIndex`); `isFeedPriceTrusted(feed, committee)` and
+  `LeanOracleClient.isFeedPriceTrusted`.
+- `verifyPriceUpdate` accepts the previous set for ticks before its switch.
+- Magics `LOPU` (update) and `LOOB` (observation).
+
 ## 1.0.0
 
 First stable release of the Lean Oracle SDK; same code as 1.0.0-beta.1.

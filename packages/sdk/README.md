@@ -66,7 +66,7 @@ freshness rule. The oracle never decides freshness for you.
 | `lean-oracle-sdk` | Consumer essentials: `feedId`, `verifyPriceUpdate`, decoders, `MirrorClient`, errors | no |
 | `lean-oracle-sdk/client` | `LeanOracleClient`, `LeanOracleTestnetClient`, `LeanOracleMainnetClient`, network presets | yes |
 | `lean-oracle-sdk/mirror` | `MirrorClient`: `latest`, `at`, `range`, `feeds`, `stream`; failover and verification | no |
-| `lean-oracle-sdk/tx` | Unsigned transaction builders: feed cells, committees, `pullAndUpdate`, `completeFee` | yes |
+| `lean-oracle-sdk/tx` | Unsigned transaction builders: feed cells (`updateFeedCells` for several at once), committee governance (`governCommittee`), `pullAndUpdate`, `completeFee` | yes |
 | `lean-oracle-sdk/ckb` | Cell reads (`getFeedCell`, `findFeedCells`, `findCommitteeCell`), scripts, clients | yes |
 | `lean-oracle-sdk/protocol` | Wire formats, hashing, Merkle proofs, signature checks | no |
 | `lean-oracle-sdk/publisher` | Signing helpers for publishers | no |

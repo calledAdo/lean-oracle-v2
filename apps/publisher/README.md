@@ -79,7 +79,7 @@ Port 7700 is the peer WebSocket, which peers must be able to reach. Port 7701 is
 | `keygen` | Print a new private key and its public key. |
 | `pubkey --key <file>` | Print a key file's public key. |
 | `sign-config --config <config.json> --key <file> --set <publisher-set.hex>` | Print this publisher's approval of a committee config. Append it to the config file's `signatures` list. |
-| `fetch-set`, `next-set`, `show-set`, `sign-rotation`, `sign-pop`, `merge-signatures`, `add-approval`, `rotation-status` | Committee rotation; see below. |
+| `fetch-set`, `next-set`, `show-set`, `sign-governance`, `sign-pop`, `merge-signatures`, `add-approval`, `governance-status` | Committee governance (rotate, pause, revoke); see below. |
 
 ## Shadow mode
 
@@ -102,37 +102,52 @@ the proposer order and the EMA depend on, and sync the rest from your peers.
 tolerance, the maximum deviation in basis points, and ticks either side missed. A summary is logged
 every minute, and every tick outside tolerance is logged as `shadow.outside_tolerance`.
 
-## Committee rotation
+## Committee governance
 
-Adding or removing a publisher rotates the committee cell. The script requires a quorum of the
-**current** set to authorize it and **every** key of the next set to prove possession. Each operator
-signs on its own machine; one coordinator collects the files and sends the transaction.
+Every change to the committee cell is one operation, approved by a quorum of the **current** set.
+Rotations also need **every** key of the next set to prove possession. Approvals name the committee
+cell, so they are useless on any other committee. Each operator signs on its own machine; one
+coordinator collects the files and sends the transaction.
+
+| `--op` | When | Notes |
+|---|---|---|
+| `rotate` | adding or removing a publisher | the old set keeps verifying ticks before `--until-ms` (the new set's first tick); only once the committee cell is `minRotationIntervalS` old (default 24 h) |
+| `rotate-revoke` | keys compromised | drops every earlier set; no waiting period |
+| `pause` / `unpause` | emergency brake | feed cells refuse updates while paused; integrators treat stored prices as unusable |
+| `revoke-previous` | a retired key leaked after a rotation | drops the previous set at any time |
 
 | Command | Who | Output |
 |---|---|---|
-| `fetch-set --operator publisher.json > current.hex` | coordinator | the committee's current set, from CKB |
-| `next-set --set current.hex --add <pubkey> [--remove <pubkey>] > next.hex` | coordinator | the proposed set; the change is printed to stderr |
-| `show-set --set next.hex [--key <file>]` | everyone | the set, for review |
-| `sign-rotation --set current.hex --next next.hex --key <file>` | current members (a quorum) | an authorization signature |
-| `sign-pop --next next.hex --key <file>` | every next member | a proof of possession |
-| `sign-config --config configs/vN.json --key <file> --set next.hex` | every next member | an approval of each active config by the next set |
+| `fetch-set --operator publisher.json > current.hex` | coordinator | the committee's current state, from CKB |
+| `next-set --set current.hex --op <op> [--add <pubkey>] [--remove <pubkey>] [--until-ms <tick>] > next.hex` | coordinator | the proposed state; the change is printed to stderr |
+| `show-set --set next.hex [--key <file>]` | everyone | the state, for review |
+| `sign-governance --set current.hex --next next.hex --op <op> --committee <type hash> --key <file>` | current members (a quorum) | an authorization signature |
+| `sign-pop --next next.hex --committee <type hash> --key <file>` | every next member (rotations only) | a proof of possession |
+| `sign-config --config configs/vN.json --key <file> --set next.hex` | every next member (rotations) | an approval of each active config by the next set |
 | `merge-signatures a.json b.json … > merged.json` | coordinator | one sorted list |
 | `add-approval --file configs/vN.json --set next.hex a.json b.json …` | coordinator | records the next set's config approval in the file |
-| `rotation-status --set current.hex --next next.hex --authorization auth.json --pop pop.json` | coordinator | what is still missing |
+| `governance-status --set current.hex --next next.hex --op <op> --committee <type hash> --authorization auth.json [--pop pop.json]` | coordinator | what is still missing |
 
-`--operator publisher.json` can replace `--key` to sign with the operator's configured key, including
-AWS KMS.
+`--operator publisher.json` can replace `--key` (signing with the operator's configured key,
+including AWS KMS) and `--committee` (taken from the operator config).
 
-Then, before sending: distribute the updated config files (with the next set's approvals) to every
-operator's `configDir`. Send with the deploy tool:
+For a rotation, before sending: distribute the updated config files (with the next set's approvals)
+to every operator's `configDir`. Send with the deploy tool:
 
 ```sh
-npm run rotate:committee -w apps/deploy -- --network testnet --name majors --next next.hex --authorization auth.json --pop pop.json --broadcast
+npm run govern:committee -w apps/deploy -- --network testnet --name majors --op rotate --next next.hex --authorization auth.json --pop pop.json --broadcast
 ```
 
-Publishers see the new set within 15 s, exit with code 3 and restart under it; a new member starts
+A routine rotation can be refused as "immature" for a minute or two after the interval has passed:
+the chain measures the cell's age with block median time, which trails the wall clock. Retry.
+
+Publishers see the new state within 15 s, exit with code 3 and restart under it; a new member starts
 signing from then on. Publisher indexes change with the set (keys are sorted), which is why each
 config needs the next set's approval before the rotation.
+
+**Limit.** If a quorum of the current keys is stolen, the thief controls the committee and no
+operation can take it back. Recovery is a new committee cell (`deploy:committee`), and integrators
+re-pin its type hash.
 
 ## Committee configs
 

@@ -9,7 +9,7 @@ description: Error codes returned by price_feed_type and publisher_set_type.
 
 | Code | Name | Meaning |
 |---|---|---|
-| 80 | FEED_DATA_MALFORMED | Cell data is not a 125-byte feed cell |
+| 80 | FEED_DATA_MALFORMED | Cell data is not a 129-byte feed cell |
 | 81 | FEED_ID_MISMATCH | Feed ID differs from the type args, or feed/committee changed |
 | 82 | FEED_CREATION_NONZERO | A new cell must have all price fields zero |
 | 83 | FEED_NOT_FORWARD | The new publish time is not later than the stored one |
@@ -18,7 +18,7 @@ description: Error codes returned by price_feed_type and publisher_set_type.
 | 86 | UPDATE_MALFORMED | The update blob does not decode |
 | 87 | UPDATE_FEED_NOT_FOUND | The blob has no entry (or two) for this feed |
 | 88 | UPDATE_PROOF | The Merkle proof does not match the root |
-| 89 | UPDATE_SET | Wrong committee, old set index, or paused committee |
+| 89 | UPDATE_SET | Wrong committee, paused committee, or a key set that may not sign this tick (not current, or the previous set at or after its switch tick, or revoked) |
 | 90 | UPDATE_SIGNATURE | Not enough valid signatures from the current set |
 | 91 | UPDATE_MISMATCH | The output data does not equal the verified price |
 

@@ -43,11 +43,13 @@ npm run show -w lean-oracle-deploy -- --network testnet
 - `deploy:code` builds the contracts first (`--skip-build` to reuse), then deploys only the
   contracts whose binary differs from the current live version.
 - `deploy:committee` creates a committee from `config.committees[name]` (1–9 keys; quorum
-  `floor(2n/3)+1`; `networkId` defaults to the chain's genesis hash). A committee is created once;
-  change its keys with `rotate:committee`.
-- `rotate:committee --next <set.hex> --authorization <sigs.json> --pop <sigs.json>`: `sigs.json` is a
-  list of `{ publisherIndex, signature }` (`signRotation` from the current quorum;
-  `signProofOfPossession` from every next key).
+  `floor(2n/3)+1`; `networkId` defaults to the chain's genesis hash; `minRotationIntervalS` defaults
+  to 86400). A committee is created once; change it with `govern:committee`.
+- `govern:committee --op <rotate|rotate-revoke|pause|unpause|revoke-previous> --next <state.hex>
+  --authorization <sigs.json> [--pop <sigs.json>]`: `sigs.json` is a list of
+  `{ publisherIndex, signature }` (`signGovernance` from the current quorum; for rotations,
+  `signProofOfPossession` from every next key). Operators produce them with the publisher CLI
+  ([apps/publisher/README.md](../publisher/README.md#committee-governance)).
 - `sync:presets` re-embeds the public records into the SDK by hand.
 
 Contracts are deployed as plain code cells referenced by `data2`: immutable, with no upgrade key. A
@@ -72,7 +74,7 @@ The test performs these steps:
 3. It checks that the contracts reject a stale update (`FEED_NOT_FORWARD`, 83) and a tampered
    output (`UPDATE_MISMATCH`, 91).
 4. It initializes a fresh cell from a past update.
-5. It rotates the committee, then checks that old-set updates are rejected (`UPDATE_SET`, 89).
+5. It rotates the committee with `rotate-revoke`, then checks that old-set updates are rejected (`UPDATE_SET`, 89).
 6. It burns a cell.
 
 It uses offckb's well-known genesis keys, which are public and valid on devnet only.

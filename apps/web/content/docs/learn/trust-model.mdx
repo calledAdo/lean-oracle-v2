@@ -24,8 +24,21 @@ permissioned and named in the committee cell.
 ## Changing the committee
 
 Keys change only through a rotation of the committee cell, authorized by a quorum of the current
-set, with proof that the new keys are held. After a rotation, only the new set's updates are
-accepted. A committee can also be paused, which stops all updates.
+set, with proof that the new keys are held. After a routine rotation the previous set still verifies
+ticks **before** the switch, so a settlement at an exact past time keeps working; nothing newer. The
+committee can revoke the previous set at any time, and an emergency rotation drops it at once.
+
+A committee can be paused. Feed cells then refuse updates, and the consumer helpers treat every
+stored price as unusable until it resumes. The same helpers stop trusting a price whose key set was
+revoked, even one already written into a cell.
+
+Every governance approval names the committee cell it is for, so it cannot be replayed on another
+committee. The committee cell has no owner: anyone may submit an approved change, and no key can
+block one.
+
+**The limit.** If a quorum of the current keys is stolen, the thief is the committee. No rule inside
+the committee can undo that. Recovery is a new committee cell, and integrators move to it by
+pinning its type hash. Pin the committee your contract trusts, and plan how you would switch.
 
 ## What the oracle leaves to you
 

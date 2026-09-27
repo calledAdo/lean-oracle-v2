@@ -13,6 +13,7 @@ import { venueNetwork, VENUES } from "./venues.js";
 interface Running {
   key: string;
   stop(): void;
+  isBackingOff?(): boolean;
 }
 
 export class SourceManager {
@@ -44,9 +45,14 @@ export class SourceManager {
         continue;
       }
       source.start();
-      this.running.set(venue, { key, stop: () => source.stop() });
+      this.running.set(venue, { key, stop: () => source.stop(), ...(source.isBackingOff ? { isBackingOff: () => source.isBackingOff!() } : {}) });
       this.log("source.started", { venue, markets });
     }
+  }
+
+  /** True while the venue's source is backing off after a refusal (REST venues). */
+  isBackingOff(venue: string): boolean {
+    return this.running.get(venue)?.isBackingOff?.() ?? false;
   }
 
   stop(): void {
@@ -54,7 +60,7 @@ export class SourceManager {
     this.running.clear();
   }
 
-  private create(venue: string, markets: string[]): { start(): void; stop(): void } | undefined {
+  private create(venue: string, markets: string[]): { start(): void; stop(): void; isBackingOff?(): boolean } | undefined {
     if (VENUES[venue]) return new VenueConnection(VENUES[venue]!, markets, this.sink, this.log, Date.now, this.lookup);
     if (REST_VENUES[venue]) return new RestPoller(REST_VENUES[venue]!, markets, this.sink, this.log, undefined, Date.now, this.lookup);
     return undefined;

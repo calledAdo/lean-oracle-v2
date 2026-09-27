@@ -25,6 +25,17 @@ unused, for rollback; v3 stores refuse the v2 format). `majors/` holds the publi
 config (`configs/v1.json`) and the publisher key (`publisher.key`, owner uid 1000, mode 600). The
 local source of these files is `secrets/testnet-run/vps/` (git-ignored).
 
+## Market-data recording
+
+Since 2026-09-27 the `majors` publisher records market data (operator config `record`, with
+`depthFeeds` set to the CKB pairs) into `majors-data-v3:/recordings`. The files are hourly gzip
+NDJSON, capped at 2 GB with the oldest hours deleted first. Recording is measurement for
+docs/designs/manipulation-resistant-pricing.md and never affects pricing. Copy the files off daily:
+
+```bash
+rsync -a root@64.227.40.35:/var/lib/docker/volumes/lean-oracle_majors-data-v3/_data/recordings/ ~/lean-recordings/
+```
+
 ## Alerts and backups
 
 - **Watchdog** (`apps/watchdog`): every 30 s it checks each publisher's latest finalized tick

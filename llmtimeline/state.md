@@ -1,6 +1,6 @@
 > llmtimeline · cross-agent work record. state.md is the live snapshot — rewrite it in place. sessions/ is append-only history — never edit past files. Any agent: read this file and the newest sessions/ entries before starting.
 
-# Project State — updated 2026-09-27T00:15Z by opus (session 008)
+# Project State — updated 2026-09-27T08:00Z by opus (session 008)
 
 ## Goal
 Build the pull-based threshold price oracle for CKB specified in docs/oracle-design.md (final 2026-09-24, first version — nothing deployed before it): committees of permissioned publishers sign per-tick Merkle-batched price updates, a mirror API serves them, and projects forward-update their own Type ID-unique price_feed_type cells.
@@ -13,7 +13,9 @@ Build the pull-based threshold price oracle for CKB specified in docs/oracle-des
 - [x] /plan-eng-review on docs/designs/v1-contract-freeze.md: 20 decisions (D1-D20) + Codex outside voice; 11 implementation tasks T1-T11 listed in the doc.
 - [~] Implement contract freeze T1-T11 (branch freeze/v1-contracts, pushed: T1-T10 done + /review fixes ef2b151; remaining T11 always-success lock + testnet v3 + SDK 2.0.0; then /ship opens the PR, merge only after T11), T10 docs done; remaining T11 always-success lock + testnet v3; do not merge before T11) (order: T1 formats first; then contracts T2/T3 in parallel with vectors T5 -> SDK T6 -> publisher T7 + mirror T8; then deploy T11 + CI T9; docs T10). Use /review then /ship per PR.
 - [ ] Backlog: TWAP60 windowed feeds (off-chain; apps/publisher/src/methodology.ts + config templates; design item 6).
-- [ ] Backlog: move Crypto.CKB/USDT and Crypto.CKB/USDC into the majors committee config and retire the ckb committee (config-only, after the freeze).
+- [x] Backlog: move Crypto.CKB/USDT and Crypto.CKB/USDC into the majors committee config and retire the ckb committee (done in T11, testnet v3).
+- [ ] Backlog: after 3+ days of recorded CKB depth snapshots, decide a depth filter (minDepthNotional) and venue weight caps for committee config v3 (docs/designs/manipulation-resistant-pricing.md sections 5, 7; D1, D8).
+- [ ] Backlog: signed COST1PCT feed (notional to move the median 1%), decided from recorded depth (same design, approach C).
 - [ ] ckb-testtool suite for publisher_set_type (negative rotation cases); consider running devnet e2e in CI.
 - [x] Finalize the design in docs/oracle-design.md.
 - [x] Contracts: common (LEAN tags, PublisherSet v1 layout, update header/leaf codecs, Merkle, verify_price_update, feed cell data), price_feed_type, publisher_set_type; ckb-testtool tests.

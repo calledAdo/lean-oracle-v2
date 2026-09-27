@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "round": 1,
+  "document": "/Users/adokiye/Nervos_Development/threshold-price-oracle/docs/designs/manipulation-resistant-pricing.md",
+  "quality_score": 6,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "ISSUES",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R1-1",
+      "dimension": "consistency",
+      "problem": "Approaches Considered lists only A and C; the chosen approach B is never described there, while C is defined as 'B plus signed risk feeds', so the comparison is incomplete.",
+      "remedy": "Add B to Approaches Considered with its scope and trade-offs, so A, B and C are compared side by side."
+    },
+    {
+      "id": "R1-2",
+      "dimension": "completeness",
+      "problem": "Step 5 drops any venue whose depth is below minDepthNotional, and Step 2 already drops venues by deviation, but nothing says what happens when too few venues remain (minimum venue quorum, fallback, or skipping the feed). That matters on CKB, where every venue has only $2k-$6k within 1%.",
+      "remedy": "Specify the minimum venue count after all filters and the behavior below it (keep the prior price, fall back to depth-flagged venues, or omit the feed), and tie it to the success criterion 'never drops a feed on more than 1% of ticks'."
+    },
+    {
+      "id": "R1-3",
+      "dimension": "clarity",
+      "problem": "The committee-config fields are all optional, but the doc does not say what an absent field means (filter disabled, as in v1, or a built-in default). That decides whether v1 configs keep their exact behavior.",
+      "remedy": "State that an absent field disables that filter (reproducing v1 behavior), or give each field an explicit default that is part of the versioned methodology."
+    },
+    {
+      "id": "R1-4",
+      "dimension": "feasibility",
+      "problem": "The trade-vs-book filter needs 'the book as of the trade time', but the doc does not say whether that uses the venue's timestamp or local receipt time, or how much book history MarketData must keep. Live publishers receive streams at different times, so they can classify the same trade differently. Replay determinism alone does not guarantee cross-publisher agreement.",
+      "remedy": "Define the timestamp source, the book-history retention inside MarketData, and the tie-breaking rules. Acknowledge that live publishers may diverge and that the leader's median across publishers absorbs this, or add a replay test that uses per-publisher skewed arrival times."
+    },
+    {
+      "id": "R1-5",
+      "dimension": "clarity",
+      "problem": "'conf = max(half-spread, MAD, |VWAP - mid|)' does not say whether the terms are per venue or aggregate, or which VWAP and mid (a single venue's, or the cross-venue median) enter |VWAP - mid|.",
+      "remedy": "Give the exact formula with each term's scope (per venue or cross-venue) and how the per-venue values are combined."
+    },
+    {
+      "id": "R1-6",
+      "dimension": "consistency",
+      "problem": "The success criterion 'changes the price by at most conf on 99% of ticks' does not say which conf (v1's or v2's). v2's conf is widened by |VWAP - mid|, so measuring against it makes the criterion close to self-fulfilling.",
+      "remedy": "Measure the price change against the v1 (baseline) conf, or against a fixed bps bound."
+    },
+    {
+      "id": "R1-7",
+      "dimension": "feasibility",
+      "problem": "The 'replay reproduces live CKB/USDT within 1 bp' criterion needs the live publisher's actual outputs and its 100 ms sampling phase for comparison. The recorder may be a sidecar with its own connections, so its event stream can differ from what the live publisher saw. The doc also does not record the live observations.",
+      "remedy": "Require the recorder to run inside the live publisher process (or to capture the exact stream it consumes), and to record the live per-tick observations beside the raw events for comparison."
+    },
+    {
+      "id": "R1-8",
+      "dimension": "completeness",
+      "problem": "Recording at an estimated 200-500 MB/day runs on a 1 GB droplet that recently had a P0 disk-exhaustion fix (bounded history). The doc gives no retention, disk cap, or cleanup policy for the recordings, and no protection of the live publisher if the disk fills.",
+      "remedy": "Specify a disk budget and a rotation/deletion or offload policy for recordings, and state that recorder failures or a full disk must not affect the live publisher."
+    },
+    {
+      "id": "R1-9",
+      "dimension": "scope",
+      "problem": "A success criterion requires 'a signed number' for the cost to move CKB/USDT 1%, but COST1PCT belongs to deferred approach C and the doc says it is not published. 'Signed' contradicts that deferral and pulls C into B.",
+      "remedy": "Restate the criterion as a computed (unsigned) measurement in the replay write-up, and leave signing to approach C."
+    },
+    {
+      "id": "R1-10",
+      "dimension": "completeness",
+      "problem": "The trade-vs-book filter still accepts wash prints within [bid - slack, ask + slack]. On a thin venue, an attacker can shift the book cheaply (about $2k within 1% on KuCoin) and then print inside it. The doc claims the fix bounds the VWAP hole without analyzing this residual attack.",
+      "remedy": "State the residual manipulation bound (spread plus slack, plus the cost of moving the book) and include a replay scenario that moves the book and then prints within it, alongside the +5% wash-print test."
+    },
+    {
+      "id": "R1-11",
+      "dimension": "clarity",
+      "problem": "The measurement 'median cost to move each venue 1%, per hour of the day' has only one sample per hour in a 24 h recording, so the median per hour is not meaningful. The follow-through measurement likewise may see few or no 1%+ Binance moves in 24 h.",
+      "remedy": "Say the per-hour and follow-through results need multiple days (or state the minimum event count), or reduce the claims to what a single 24 h recording can support."
+    }
+  ],
+  "prior": []
+}

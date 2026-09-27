@@ -40,8 +40,9 @@ import { startApi } from "./api.js";
 import { fetchCommitteeData } from "./chain.js";
 import { loadConfig, loadConfigDir } from "./config.js";
 import { parseDecimal } from "./fixed.js";
-import { MarketData } from "./marketData.js";
+import { MarketData, type MarketDataSink } from "./marketData.js";
 import { PublisherNode } from "./node.js";
+import { Recorder } from "./recorder.js";
 import { DEFAULT_RETENTION_HOURS, startPruning } from "./retention.js";
 import { TickScheduler } from "./scheduler.js";
 import { emitMockQuotes, mockMarketsFor } from "./sources/mock.js";
@@ -84,10 +85,12 @@ async function run(configPath: string): Promise<void> {
     transport,
     marketData,
     log,
+    onObserved: (tickMs, entries) => recording.recorder?.tick(tickMs, entries),
   });
 
   const stops: (() => void)[] = [];
-  startSources(c, marketData, stops);
+  const recording = startRecorder(c, marketData, stops);
+  recording.attach(startSources(c, recording.sink, stops, recording.sourceLog));
 
   const scheduler = new TickScheduler(node, c.schedule);
   scheduler.start();
@@ -137,7 +140,7 @@ async function run(configPath: string): Promise<void> {
 type Loaded = Awaited<ReturnType<typeof loadConfig>>;
 
 /** Exchange connections (or mock quotes) for every held config version, and pick-up of new versions. */
-function startSources(c: Loaded, marketData: MarketData, stops: (() => void)[]): void {
+function startSources(c: Loaded, marketData: MarketDataSink, stops: (() => void)[], sourceLog: SourceLog = log): SourceManager | undefined {
   const allConfigs = () => c.schedule.all().map((v) => v.config);
   if (c.operator.mockSource) {
     const prices = Object.fromEntries(Object.entries(c.operator.mockSource.prices).map(([k, v]) => [k, parseDecimal(v)]));
@@ -147,8 +150,9 @@ function startSources(c: Loaded, marketData: MarketData, stops: (() => void)[]):
     }, 250);
     stops.push(() => clearInterval(timer));
     log("source.mock");
+    return undefined;
   } else {
-    const sources = new SourceManager(marketData, log, exchangeLookup(c.operator.network?.dns));
+    const sources = new SourceManager(marketData, sourceLog, exchangeLookup(c.operator.network?.dns));
     sources.sync(allConfigs());
     stops.push(() => sources.stop());
     // Pick up newly approved config versions and subscribe to any new markets.
@@ -160,8 +164,56 @@ function startSources(c: Loaded, marketData: MarketData, stops: (() => void)[]):
       }
     }, 15_000);
     stops.push(() => clearInterval(timer));
+    return sources;
   }
+}
 
+/**
+ * The recorder (operator config `record`): a tap between the sources and MarketData, plus depth
+ * snapshots. Measurement only; its failures turn recording off, never pricing.
+ */
+type SourceLog = (event: string, detail?: Record<string, unknown>) => void;
+
+interface RecorderWiring {
+  /** Where sources deliver events: the recorder when recording, else MarketData itself. */
+  sink: MarketDataSink;
+  recorder?: Recorder;
+  /** Source log that also records venue and source events. */
+  sourceLog: SourceLog;
+  /** Hand over the running sources, so depth snapshots skip venues that are backing off. */
+  attach(sources: SourceManager | undefined): void;
+}
+
+function startRecorder(c: Loaded, marketData: MarketData, stops: (() => void)[]): RecorderWiring {
+  const record = c.operator.record;
+  if (!record) return { sink: marketData, sourceLog: log, attach: () => {} };
+  const feeds = new Set(record.depthFeeds ?? []);
+  const depth = c.schedule.all().flatMap((v) => v.config.feeds.filter((f) => feeds.has(f.symbol)).flatMap((f) => f.markets.map((m) => ({ venue: m.venue, market: m.market }))));
+  const unique = [...new Map(depth.map((d) => [`${d.venue}:${d.market}`, d])).values()];
+  let sources: SourceManager | undefined;
+  const recorder = new Recorder(marketData, {
+    dir: record.dir!,
+    ...(record.maxBytes !== undefined ? { maxBytes: record.maxBytes } : {}),
+    depth: unique,
+    isBackingOff: (venue) => sources?.isBackingOff(venue) ?? false,
+    lookup: exchangeLookup(c.operator.network?.dns),
+    log,
+  });
+  stops.push(() => recorder.stop());
+  const sourceLog: SourceLog = (event, detail = {}) => {
+    log(event, detail);
+    if (event.startsWith("venue.") || event.startsWith("source.")) recorder.event(event, detail);
+  };
+  log("recorder.started", { dir: record.dir, depthMarkets: unique.length });
+  return {
+    sink: recorder,
+    recorder,
+    sourceLog,
+    attach: (s) => {
+      sources = s;
+      recorder.startDepth();
+    },
+  };
 }
 
 /** Shadow mode: price every feed like a member, sign nothing, compare with the committee's updates. */

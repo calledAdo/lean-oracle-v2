@@ -57,6 +57,12 @@ export class RestPoller {
     if (this.timer) clearInterval(this.timer);
   }
 
+  /** True while any of this venue's markets is backing off after a refusal. */
+  isBackingOff(): boolean {
+    const now = this.now();
+    return [...this.backoffUntil.values()].some((until) => until > now);
+  }
+
   async poll(): Promise<void> {
     await Promise.all(this.markets.map((m) => this.pollMarket(m)));
   }

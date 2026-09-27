@@ -30,6 +30,7 @@ import {
   type CommitteeConfig,
   type Hex,
   type Observation,
+  type ObservationEntry,
   type PriceUpdate,
   type PriceUpdateHeader,
   type PublisherSetData,
@@ -61,6 +62,8 @@ export interface PublisherNodeOptions {
   log?: (event: string, detail?: Record<string, unknown>) => void;
   /** Clock skew tolerated when checking a proposer's slot, in ms. */
   skewMs?: number;
+  /** Called with this publisher's own entries every tick it observes (the recorder). */
+  onObserved?: (tickMs: bigint, entries: ObservationEntry[]) => void;
 }
 
 interface Derived {
@@ -140,6 +143,7 @@ export class PublisherNode {
     const active = this.o.schedule.at(tickMs);
     if (!active || (this.o.publisherSet.governanceFlags & GOVERNANCE_PAUSED) !== 0) return;
     const entries = observeFeeds(active.config, this.o.marketData, Number(tickMs));
+    this.o.onObserved?.(tickMs, entries);
     if (entries.length === 0) {
       this.log("observe.empty", { tickMs: tickMs.toString() });
       return;

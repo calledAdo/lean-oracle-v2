@@ -44,6 +44,14 @@ docker run -d --name publisher \
 
 Paths are relative to the config file.
 
+- **`record`.** Optional market-data recording for replaying methodology changes
+  (`{ "dir", "maxBytes", "depthFeeds" }`; `dir` defaults to `<dataDir>/recordings`, `maxBytes` to
+  2 GB). It writes hourly gzip newline-JSON files of every quote, trade, liveness event, source
+  error and this publisher's own observation per tick. For feeds in `depthFeeds` (for example
+  `["Crypto.CKB/USDT", "Crypto.CKB/USDC"]`), it also takes REST order-book snapshots every 30 s.
+  Snapshots skip a venue whose price source is backing off, and wait 10 minutes after a 403 or 429.
+  The oldest hours are deleted beyond `maxBytes`. It is measurement only: a full disk or write
+  error turns recording off, never pricing. See docs/designs/manipulation-resistant-pricing.md.
 - **`retentionHours`.** How long finalized updates stay in the local store (default 24; `0` keeps
   everything; otherwise at least 1). Mirrors are the archive; this bounds the publisher's disk at
   about 0.4 GB per day of window for 12 feeds at 1 s ticks. Peers and mirrors offline for longer

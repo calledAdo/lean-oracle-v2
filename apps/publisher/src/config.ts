@@ -44,6 +44,12 @@ export interface OperatorConfig {
    */
   retentionHours?: number;
   /**
+   * Record market data for replaying methodology changes (measurement only; never affects pricing).
+   * `dir` defaults to `<dataDir>/recordings`, `maxBytes` to 2 GB (oldest hours deleted first).
+   * `depthFeeds` lists feed symbols whose markets also get REST order-book snapshots every 30 s.
+   */
+  record?: { dir?: string; maxBytes?: number; depthFeeds?: string[] };
+  /**
    * Shadow mode: record and price every feed like a member, but sign nothing and join no peers;
    * compare the results with the committee's signed updates from this mirror. The key need not be
    * in the committee.
@@ -139,7 +145,7 @@ export async function loadConfig(path: string): Promise<LoadedConfig> {
     peers.set(peerIndex, peer.url);
   }
   return {
-    operator: { ...operator, dataDir: at(operator.dataDir), committee: { ...operator.committee, publisherSetTypeHash, configDir } },
+    operator: { ...operator, dataDir: at(operator.dataDir), ...(operator.record ? { record: { ...operator.record, dir: at(operator.record.dir ?? join(operator.dataDir, "recordings")) } } : {}), committee: { ...operator.committee, publisherSetTypeHash, configDir } },
     signer,
     index,
     publisherSet,

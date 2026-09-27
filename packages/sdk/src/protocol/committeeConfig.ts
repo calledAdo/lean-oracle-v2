@@ -30,6 +30,22 @@ export interface PriceMethod {
   minTopNotional?: number;
   /** After a first median, drop venues further than this from it, then take the median again. */
   maxDeviationBps?: number;
+  /**
+   * `vwap` only. Clamp each venue's VWAP into its median bid/ask over the window, and widen conf by the
+   * median |VWAP − mid| gap, so trades can move a venue at most to its own book's edge. A venue with no
+   * usable book in the window falls back to `mid`. Absent: off (v1 behavior).
+   */
+  vwapClampToBook?: boolean;
+  /**
+   * `vwap` only, websocket venues only (REST venues stamp trades with poll time). A trade counts only if
+   * its price is within `[bid − slack, ask + slack]` of a book state within ±`tradeBookToleranceMs` of it,
+   * where slack = the venue's median half-spread over the window × `tradeBookSlackPct` / 100. Both fields
+   * together; absent: off (v1 behavior).
+   */
+  tradeBookToleranceMs?: number;
+  tradeBookSlackPct?: number;
+  /** `vwap` only: below this accepted trade notional in the window (quote currency), use `mid`. Absent: off. */
+  vwapMinWindowNotional?: number;
   /** At least 2; the config must list at least one more market than this. */
   minVenues: number;
   /** One market per venue, each trading exactly `<base>/<quote>`. */
@@ -103,9 +119,20 @@ export function validateCommitteeConfig(config: CommitteeConfig): string[] {
     positive(`${name}.maxQuoteAgeMs`, m.maxQuoteAgeMs);
     positive(`${name}.maxSpreadBps`, m.maxSpreadBps);
     positive(`${name}.minVenues`, m.minVenues);
-    for (const [field, value] of [["maxBookAgeMs", m.maxBookAgeMs], ["minTopNotional", m.minTopNotional], ["maxDeviationBps", m.maxDeviationBps]] as const) {
+    for (const [field, value] of [
+      ["maxBookAgeMs", m.maxBookAgeMs],
+      ["minTopNotional", m.minTopNotional],
+      ["maxDeviationBps", m.maxDeviationBps],
+      ["tradeBookToleranceMs", m.tradeBookToleranceMs],
+      ["tradeBookSlackPct", m.tradeBookSlackPct],
+      ["vwapMinWindowNotional", m.vwapMinWindowNotional],
+    ] as const) {
       if (value !== undefined) positive(`${name}.${field}`, value);
     }
+    if ((m.tradeBookToleranceMs === undefined) !== (m.tradeBookSlackPct === undefined)) {
+      problems.push(`${name}: tradeBookToleranceMs and tradeBookSlackPct go together`);
+    }
+    if (m.vwapClampToBook !== undefined && typeof m.vwapClampToBook !== "boolean") problems.push(`${name}: vwapClampToBook must be true or false`);
     // No single exchange can set a price, and one exchange failing does not stop the feed.
     if (m.minVenues < 2) problems.push(`${name}: minVenues must be at least 2`);
     if (m.markets.length < m.minVenues + 1) problems.push(`${name}: needs at least minVenues + 1 markets`);

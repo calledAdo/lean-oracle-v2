@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (unreleased)
+
+- Committee-config `PriceMethod` gains optional `vwapClampToBook`, `tradeBookToleranceMs` and
+  `tradeBookSlackPct` (together), and `vwapMinWindowNotional`; `validateCommitteeConfig` checks them.
+  Configs without them are unchanged (docs/designs/manipulation-resistant-pricing.md).
+
 ## 2.0.0 (2026-09-26)
 
 Contract freeze formats (docs/designs/v1-contract-freeze.md). Not compatible with 1.x; matches the

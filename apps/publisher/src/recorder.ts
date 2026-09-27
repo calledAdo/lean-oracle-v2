@@ -164,10 +164,13 @@ export class Recorder implements MarketDataSink {
         return;
       }
       const line = `${JSON.stringify(record, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}\n`;
-      if (!gzip.write(line) || gzip.writableLength > HIGH_WATER_BYTES) {
+      // Node's own high-water mark (16 KB) is far below an ordinary burst; queue up to our bound and
+      // only then drop, resuming once the stream has drained.
+      gzip.write(line);
+      if (gzip.writableLength > HIGH_WATER_BYTES) {
         this.blocked = true;
         gzip.once("drain", () => {
-          if (this.dropped > 0) this.log("recorder.dropped", { events: this.dropped });
+          this.log("recorder.dropped", { totalEvents: this.dropped });
           this.blocked = false;
         });
       }

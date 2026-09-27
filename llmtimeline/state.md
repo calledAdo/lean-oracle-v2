@@ -1,6 +1,6 @@
 > llmtimeline · cross-agent work record. state.md is the live snapshot — rewrite it in place. sessions/ is append-only history — never edit past files. Any agent: read this file and the newest sessions/ entries before starting.
 
-# Project State — updated 2026-09-27T00:15Z by opus (session 008)
+# Project State — updated 2026-09-27T08:00Z by opus (session 008)
 
 ## Goal
 Build the pull-based threshold price oracle for CKB specified in docs/oracle-design.md (final 2026-09-24, first version — nothing deployed before it): committees of permissioned publishers sign per-tick Merkle-batched price updates, a mirror API serves them, and projects forward-update their own Type ID-unique price_feed_type cells.

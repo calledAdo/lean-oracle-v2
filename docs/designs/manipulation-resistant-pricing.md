@@ -295,3 +295,271 @@ Stop: CONVERGENCE
 
 > Section 4 defines the timestamp source, book-history retention and ties, and section 3 adds the ±50 ms divergence test. But venue-time trades are still compared with receipt-time book states and no clock reconciliation is given.
 <!-- gstack:office-hours:concerns:end -->
+
+## Eng review (2026-09-27)
+
+Target: docs/designs/manipulation-resistant-pricing.md. Report file: this document.
+
+### Scope record
+
+feature answers: D1 = A (defer the minDepthNotional filter; the recorder takes REST order-book
+snapshots every 10 s for the 5 CKB venues, measurement only, never used for pricing);
+structure: D2 = B (smaller arrangement);
+accepted scope:
+- in-process recorder, `apps/publisher/src/recorder.ts`: MarketData tap, CKB depth snapshots,
+  hourly rotation and disk cap;
+- `apps/publisher/scripts/replay.mjs`, reusing `observeFeeds` and `MarketData`;
+- the trade-vs-book filter and the volume floor for `vwap`;
+- the |VWAP − mid| gap term in conf;
+- the optional committee-config fields (SDK `PriceMethod` and `validateCommitteeConfig`);
+- tests and docs.
+
+pending remedies: R1 (recording disk cap), R2 (slack half-spread), R3 (divergence pass rule).
+
+### Scope Challenge findings
+
+1. **[P2] Clock, factual correction (confidence 9/10).** The design says "venue trade time when
+   the venue provides it". The code stamps every quote and trade with local receipt time:
+   - `apps/publisher/src/sources/runner.ts:51` `const timeMs = this.now();`
+   - `apps/publisher/src/sources/rest.ts:100` `timeMs: receivedMs`
+
+   So trades and books already share one clock. The filter uses receipt time for both, and venue
+   timestamps are not used. The tolerance still covers a trade and the matching book update
+   arriving in separate messages. This settles Reviewer Concern R2-1. No behavior question is
+   needed: it matches existing code.
+2. **[P2] Depth filter vs venue count (confidence 8/10), Reviewer Concern R2-2.** Resolved by D1.
+   No depth filter in pricing, so the median still needs 3 of 5 CKB venues moved.
+3. **[P2] Disk arithmetic (confidence 8/10), Reviewer Concern R2-3.** Measured:
+   - the droplet has 24 GB, 5.8 GB used today;
+   - nightly backups are 306 MB for about 1.5 GB of stores, so gzip keeps roughly 10–20%.
+
+   Steady state is about 5 GB (OS and images) + 5.9 GB (stores) + ~1.7 GB (3 days of backups)
+   + the recording cap. See R1.
+4. **[P2] Slack definition (confidence 8/10), Reviewer Concern R2-4.** See R2.
+5. **[P3] Divergence pass rule (confidence 8/10), Reviewer Concern R2-5.** See R3.
+6. **[P2] SDK release (confidence 9/10).** The new fields live in the SDK's `PriceMethod`
+   (`packages/sdk/src/protocol/committeeConfig.ts:17`) and `validateCommitteeConfig`. Publishers
+   build from the workspace, but external config tools need `lean-oracle-sdk` 2.1.0 (additive).
+   This is necessary implementation of the approved fields, not a new choice.
+
+## Decision ledger
+
+### R1: recording disk cap
+Finding: Scope Challenge 3, P2, confidence 8/10, design section 1 (`record.maxBytes` defaults to 3 GB).
+Plan baseline: `record.maxBytes` = 3 GB; oldest files deleted first; offload unspecified.
+Runtime evidence: droplet disk 24 GB, 5.8 GB used; projected steady state about 12.6 GB before recordings.
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R1 cap | 3 GB (proposed) | 2 GB, deletion never waits for offload | 3 GB, deletion never waits for offload |
+Question D3: How big may the recordings on the droplet get? (A 2 GB recommended; B 3 GB)
+State: approved
+Actual answer: A) 2 GB cap (D3)
+Accepted scope: `record.maxBytes` default 2 GB; the oldest hour is deleted first; deletion never waits for the offload copy.
+
+### R2: slack half-spread in the trade-vs-book filter
+Finding: Scope Challenge 4, P2, confidence 8/10, design section 4 (`slack = half-spread × tradeBookSlackSpreads`).
+Plan baseline: half-spread source unspecified.
+Runtime evidence: none (proposed code).
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R2 half-spread | unspecified | the matching book state's own half-spread | venue median half-spread hs_v over the window |
+Question D4: Which spread sets the tolerance band for accepting a trade? (B recommended)
+State: approved
+Actual answer: B) Venue median spread (D4)
+Accepted scope: `slack = hs_v × tradeBookSlackSpreads`, where `hs_v` is the venue's median half-spread over the window (the same `hs_v` as in conf).
+
+### R3: divergence-test pass rule
+Finding: Scope Challenge 5, P3, confidence 8/10, design section 3 ("within their confs of each other").
+Plan baseline: pass rule unspecified.
+Runtime evidence: none (proposed test).
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R3 rule | unspecified | abs(P_i - P_j) <= min(conf_i, conf_j) on >= 99% of ticks, and every tick within max(conf_i, conf_j) | abs(P_i - P_j) <= max(conf_i, conf_j) on 100% of ticks |
+Question D5: What counts as a pass for the publisher divergence test? (A recommended)
+State: approved
+Actual answer: A) Min conf 99%, max always (D5)
+Accepted scope: for every pair of simulated publishers, `|P_i − P_j| ≤ min(conf_i, conf_j)` on at least 99% of ticks and `≤ max(conf_i, conf_j)` on every tick.
+
+### R4: trade-vs-book filter vs VWAP clamp (reopened by the outside voice)
+Finding: Outside Voice 1 and 2, P1, confidence 9/10. MEXC is REST-polled (`apps/publisher/src/sources/rest.ts:22-23` `venue: "mexc", intervalMs: 1000`) and its trades are stamped with poll time (`rest.ts:100` `timeMs: receivedMs`), so trade-time book matching is meaningless there. Prints at the book edge pass the filter, so no hard bound exists.
+Plan baseline: the trade-vs-book filter everywhere (design section 4; D4, D6).
+Runtime evidence: as quoted above.
+Comparison grid:
+| Choice | Current | A | B | C |
+|---|---|---|---|---|
+| R4 mechanism | filter everywhere | clamp only | clamp everywhere, and the filter on websocket venues only | filter only |
+Question D7: Replace the trade-vs-book filter with a VWAP clamp? (B recommended)
+State: approved
+Actual answer: B) Clamp + WS filter (D7)
+Accepted scope:
+- Every `vwap` venue's price is clamped into its median `[bid, ask]` over the window. A venue with
+  no usable quote in the window is not priced by `vwap`: it falls back to `mid`, which then also
+  finds no quote and drops the venue.
+- The trade-vs-book filter (D4 slack, D6 merged pass) runs only on websocket venues.
+- REST venues (MEXC today) get the clamp alone.
+History: supersedes the section 4 "filter everywhere" baseline; D4 and D6 stay approved for websocket venues.
+
+### Corrections carried as necessary implementation (no new choice)
+- **`hs_v` with no quotes** (Outside Voice 3). With no usable quote there is no book to clamp to,
+  so the venue drops out (R4). The filter never runs with a zero slack.
+- **Replay fidelity** (Outside Voice 4). This is required for the approved "replay matches live"
+  criterion. The recorder also writes:
+  - each tick's scheduled time and actual start time;
+  - `alive` events;
+  - source errors and REST backoff start and end.
+- **Recorded trades are post-dedupe** (Outside Voice 5). Recordings hold what `MarketData`
+  received, not raw venue payloads, and REST trades carry poll time. Documented in the recorder
+  header.
+- **Depth snapshots must not trigger rate limits** (Outside Voice 6). This is required by the
+  approved isolation promise:
+  - snapshots every 30 s, not every 10 s (supersedes D1's 10 s; D1's intent, measurement only, is
+    unchanged);
+  - a snapshot for a venue is skipped while that venue's price poller is backing off;
+  - a 403 or 429 on a snapshot backs off that snapshot for 10 minutes.
+- **Follow-through measurement** (Outside Voice 7). It is computed only on websocket venues
+  (Binance to Gate, Bitget, KuCoin). MEXC is excluded because of its 1 s poll quantization.
+
+Approval readiness: PASS (checked: scope record D1 and D2; R1/D3, R2/D4, R3/D5, R4/D7; the D6
+merged pass; TODO D8; the corrections above as necessary implementation of approved behavior).
+
+## Review: Sections 1–4
+
+**Architecture.** One finding, R4 (from the outside voice), resolved by D7. The recorder is an
+extra `MarketDataSink` tap with a bounded write queue that drops on overflow, so it can never
+stall the event loop. It has no security surface: it holds public market data only.
+
+```
+venue WS / REST poll ──► MarketData (receipt-time stamps) ──► observeFeeds(tickMs)
+        │                      │                                  │
+        │                      └──► recorder.ts tap ──► gz hourly files (cap 2 GB)
+        └── CKB REST depth snapshots (30 s, backoff-aware) ──► recorder.ts
+vwap venue:  trades(window) ─[WS only: trade-vs-book filter, slack = hs_v × k]─► VWAP
+                             ─► clamp to median [bid, ask] ─► cross-venue median (unchanged)
+recordings ──► scripts/replay.mjs ──► v1 vs v2 observations + diff + live comparison
+```
+
+**Code quality.**
+- Reuse `MarketData.quotesIn` and `tradesIn` for the window slices. The D6 merged pass replaces
+  per-trade lookups.
+- `hs_v` is one helper, shared by the slack and by conf.
+- An absent config field keeps v1 behavior (section 6).
+- The new optional fields go in the SDK's `validateCommitteeConfig`, rejecting non-positive values.
+
+**Tests** (node:test, `apps/publisher/tests`):
+
+```
+CODE PATHS                                         SCENARIOS
+[+] methodology.ts marketPrice (vwap)
+  ├── [GAP] clamp: VWAP above ask ─► clamped to ask         unit (units.test.mjs)
+  ├── [GAP] clamp: VWAP below bid ─► clamped to bid         unit
+  ├── [GAP] no usable quote ─► venue dropped                unit
+  ├── [GAP] WS venue: +5% wash print, $10 volume ─► rejected, aggregate unchanged
+  ├── [GAP] WS venue: print at ask + slack ─► accepted, then clamped
+  ├── [GAP] REST venue: filter skipped, clamp applied       unit
+  ├── [GAP] volume floor ─► falls back to mid               unit
+  ├── [GAP] merged pass == naive lookup on recorded data    unit (D6)
+  └── [★★★ TESTED] existing mid/vwap paths ─► v2.test.mjs, units.test.mjs (regression: absent fields = v1 output)
+[+] conf = max(median hs_v, MAD, median gap_v)   [GAP] unit
+[+] sdk validateCommitteeConfig new fields        [GAP] valid, absent, negative ─► reject
+[+] recorder.ts
+  ├── [GAP] rotation hourly, cap 2 GB deletes oldest first
+  ├── [GAP] disk full / write error ─► recording off, pricing continues
+  ├── [GAP] queue overflow ─► drops events, never blocks
+  └── [GAP] depth snapshot 429 ─► 10 min backoff; skipped while price poller backs off
+[+] scripts/replay.mjs
+  ├── [GAP] two instances byte-identical
+  └── [GAP] 3 publishers, ±50 ms skew: min-conf on ≥ 99% of ticks, max-conf always (D5)
+COVERAGE: 1/19 paths tested today | GAPS: 18 (all unit or script tests; no E2E needed)
+```
+
+REGRESSION (critical): a committee config without the new fields must produce byte-identical
+observations to today's code on the same recorded input. This is covered by the "absent fields =
+v1 output" test.
+
+**Performance.** One finding, the quadratic lookup, resolved by D6 (the merged pass). The recorder
+compresses with streaming gzip off the tick path.
+
+## NOT in scope
+- Depth-aware pricing filter and venue weight caps: deferred to backlog (D1, D8).
+- TWAP60 and `COST1PCT` feeds: approach C, backlog.
+- Using venue timestamps for REST trades: not needed, since the clamp bounds REST venues (D7).
+
+## What already exists
+- `MarketData` receipt-time history (`quotesIn`, `tradesIn`, 300 s retention) is reused.
+- `observeFeeds` is reused unchanged by the replay.
+- Committee-config versioning and activation carry v2.
+- `RestPoller` backoff state is reused to gate depth snapshots.
+
+## Failure modes
+| Path | Realistic failure | Handling | Visible? |
+|---|---|---|---|
+| Recorder writes | disk full | recording turns off, log line, health flag | yes (log, health) |
+| Depth snapshots | 429 from MEXC | 10 min backoff, skipped during price backoff | yes (log) |
+| Clamp | no quote in window | venue dropped; minVenues decides | yes (feed missing, as today) |
+| WS filter | clock gap between trade and book messages | tolerance; the clamp still bounds | silent but bounded |
+| Replay | missing tick/alive events | recorded explicitly (corrections) | test fails loudly |
+No critical gaps: every silent path is bounded by the clamp.
+
+## Implementation Tasks
+- [ ] **T1 (P1, human ~1 day / CC ~40 min)**: recorder: `apps/publisher/src/recorder.ts`.
+  - Includes: the `MarketDataSink` tap; tick, alive, error and backoff events; CKB depth snapshots
+    every 30 s with backoff; hourly gz rotation; 2 GB cap; a bounded queue. Wired in `main.ts`
+    behind the operator-config `record` option.
+  - Surfaced by: scope D1/D2, R1, outside voice 4 and 6.
+  - Verify: recorder unit tests.
+- [ ] **T2 (P1, human ~1 day / CC ~30 min)**: deploy the recorder to the droplet.
+  - Start the 3-day recording; set up the daily rsync offload.
+  - Verify: files rotate and disk stays under 65%.
+- [ ] **T3 (P1, human ~2 days / CC ~1 h)**: pricing, in `methodology.ts`.
+  - The VWAP clamp; the websocket-only trade-vs-book filter (D4 slack, D6 merged pass); the volume
+    floor; the conf gap term. Absent fields keep v1 behavior.
+  - Surfaced by: D7, D4, D6.
+  - Verify: the unit tests above and the regression test.
+- [ ] **T4 (P1, human ~2 h / CC ~15 min)**: SDK `PriceMethod` fields and validation; SDK 2.1.0
+  changelog. Surfaced by Scope Challenge 6.
+- [ ] **T5 (P1, human ~1 day / CC ~40 min)**: `scripts/replay.mjs`, with the determinism and
+  divergence (D5) tests.
+- [ ] **T6 (P2, human ~1 day / CC ~30 min)**: replay 3+ days v1 vs v2.
+  - Write up: filter rates, cost to move each venue, follow-through (websocket venues only).
+  - Choose v2 thresholds.
+- [ ] **T7 (P2, human ~2 h / CC ~15 min)**: committee config v2 on testnet, signed with an
+  activation tick; update the methodology docs.
+
+Parallelization: Lane A is T1 → T2 (the recording clock starts first). Lane B is T3 + T4 → T5,
+in parallel. Merge both, then T6 → T7.
+
+## Completion summary
+- Step 0: Scope Challenge: scope reduced per recommendation (D1 defers depth pricing; D2 uses the smaller arrangement)
+- Architecture Review: 1 issue found (R4)
+- Code Quality Review: 0 issues found
+- Test Review: diagram produced, 18 gaps identified
+- Performance Review: 1 issue found (D6)
+- NOT in scope: written
+- What already exists: written
+- TODOS.md updates: 1 item proposed to user (added to the llmtimeline backlog)
+- Failure modes: 0 critical gaps flagged
+- Unresolved decisions: 0 in this review
+- Outside voice: Codex unavailable (503); Claude Plan subagent completed (native fallback, 7 findings)
+- Parallelization: 2 lanes, 2 parallel / 1 sequential merge
+- Lake Score: 5/5 recommended complete options chosen
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Outside Review | codex (503) then Claude Plan subagent | Independent 2nd opinion | 1 | unavailable (native fallback completed) | 7 findings, 1 reopened choice (D7) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES OPEN (mapped to tasks) | 21 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **OUTSIDE COVERAGE:** codex, plan-review, unavailable (HTTP 503). A native Claude Plan subagent
+  completed as a fallback; it gives no outside-model coverage.
+- **VERDICT:** Eng review complete, with all decisions answered and issues mapped to tasks T1–T7.
+  Ready to implement.
+
+NO UNRESOLVED DECISIONS
+

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "round": 2,
+  "document": "/Users/adokiye/Nervos_Development/threshold-price-oracle/docs/designs/manipulation-resistant-pricing.md",
+  "quality_score": 8,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "PASS",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R2-1",
+      "dimension": "feasibility",
+      "problem": "The trade-vs-book filter compares a trade's venue timestamp with book states whose history is kept at 100 ms resolution in local receipt time (section 4). Venue clocks and local clocks differ by clock offset plus network latency, and the doc does not say which clock indexes the book history or how the two are reconciled. A fixed offset larger than tradeBookToleranceMs would reject every trade from that venue, or match trades against the wrong book.",
+      "remedy": "Say which clock the book history uses. Use venue time for the books too when the venue provides it, or measure and correct each venue's clock offset, and add a replay check that reports the offset distribution per venue."
+    },
+    {
+      "id": "R2-2",
+      "dimension": "consistency",
+      "problem": "The residual-attack claim and the moved-book success criterion assume that 3 of 5 venues must be moved. But the new minDepthNotional filter drops thin venues before the median, and on CKB Gate and KuCoin have only about $2.2k-$2.4k within 1%. With a meaningful threshold, the median may be taken over 3 venues, where moving 2 is enough.",
+      "remedy": "State the attack cost as a function of the number of venues left after the depth filter, and bound or check minDepthNotional so that the claimed cost (and the minVenues setting) still holds with the venues that actually remain."
+    },
+    {
+      "id": "R2-3",
+      "dimension": "completeness",
+      "problem": "The disk-budget claim that the droplet 'stays under 60%' (3 GB of recordings plus ~5.5 GB mirror plus ~0.4 GB publisher, about 9 GB) never states the droplet's disk size, so it cannot be checked. The daily rsync offload also has no stated owner or failure behavior.",
+      "remedy": "State the droplet disk size and the arithmetic behind the 60% figure, and say who runs the offload and that deletion under the cap proceeds even if the offload has not run."
+    },
+    {
+      "id": "R2-4",
+      "dimension": "clarity",
+      "problem": "The slack uses 'half-spread', but section 4 does not say whether that is the half-spread of the matching book state or the venue's median half-spread hs_v from section 5. The two can differ a lot on a book the attacker has just moved.",
+      "remedy": "Define the slack's half-spread as the matching book state's half-spread or as hs_v, and note how the choice affects the residual bound."
+    },
+    {
+      "id": "R2-5",
+      "dimension": "clarity",
+      "problem": "The divergence test requires that the three simulated publishers' prices 'stay within their confs of each other' without saying which conf (each publisher's own, the minimum, or the maximum) or the pass rate over ticks.",
+      "remedy": "Give the exact pass condition, for example |P_i - P_j| <= min(conf_i, conf_j) on 100% (or a stated share) of ticks."
+    }
+  ],
+  "prior": [
+    {"id": "R1-1", "status": "resolved", "evidence": "Approaches Considered now lists B (evidence-first, chosen) with its scope, Effort M and trade-offs alongside A and C.", "current_id": null},
+    {"id": "R1-2", "status": "resolved", "evidence": "Section 5: minVenues applies after every filter, and below it the feed is omitted for that tick. This is tied to the success criterion 'Coverage kept' (at most 1% of ticks).", "current_id": null},
+    {"id": "R1-3", "status": "resolved", "evidence": "Section 6: 'An absent field disables its filter', so an existing v1 config prices exactly as today.", "current_id": null},
+    {"id": "R1-4", "status": "persisting", "evidence": "Section 4 defines the timestamp source, book-history retention and ties, and section 3 adds the ±50 ms divergence test. But venue-time trades are still compared with receipt-time book states and no clock reconciliation is given.", "current_id": "R2-1"},
+    {"id": "R1-5", "status": "resolved", "evidence": "Section 5 defines per-venue hs_v and gap_v, MAD against aggregate P, and conf = max(median(hs_v), MAD, median(gap_v)).", "current_id": null},
+    {"id": "R1-6", "status": "resolved", "evidence": "Success criteria: v2 price differs from v1 by at most v1's conf on 99% of ticks.", "current_id": null},
+    {"id": "R1-7", "status": "resolved", "evidence": "Section 1: the recorder runs in-process, taps the same MarketData input, and writes each tick's own observations for comparison.", "current_id": null},
+    {"id": "R1-8", "status": "resolved", "evidence": "Section 1 adds the record.maxBytes 3 GB cap with oldest-first deletion, asynchronous best-effort isolation that never blocks pricing, and a daily offload. The unsupported 60% arithmetic is tracked separately as a new finding.", "current_id": null},
+    {"id": "R1-9", "status": "resolved", "evidence": "The success criterion 'Cost measured' is now unsigned, and signing is left to approach C.", "current_id": null},
+    {"id": "R1-10", "status": "resolved", "evidence": "Section 4 'Residual attack' states the bound (book-moving cost plus spread + slack), and a moved-book success criterion was added. Its assumption about the venue count is a new finding.", "current_id": null},
+    {"id": "R1-11", "status": "resolved", "evidence": "Section 7 uses at least 3 days, 4-hour buckets (18+ samples), and a minimum of 10 events for follow-through, otherwise 'insufficient events'.", "current_id": null}
+  ]
+}

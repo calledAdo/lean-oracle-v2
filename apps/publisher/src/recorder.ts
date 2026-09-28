@@ -69,6 +69,7 @@ export class Recorder implements MarketDataSink {
   private blocked = false;
   private dropped = 0;
   private failed = false;
+  private closing: Promise<void> | undefined;
   private depthTimer: NodeJS.Timeout | undefined;
   private readonly depthBackoffUntil = new Map<string, number>();
 
@@ -129,14 +130,21 @@ export class Recorder implements MarketDataSink {
     void this.close();
   }
 
-  /** Stop depth snapshots and flush the current file. */
-  async close(): Promise<void> {
+  /** Stop depth snapshots and flush the current file. Safe to call more than once. */
+  close(): Promise<void> {
     if (this.depthTimer) clearInterval(this.depthTimer);
     const file = this.file;
-    this.gzip?.end();
+    if (!this.gzip || !file) return this.closing ?? Promise.resolve();
+    this.closing = new Promise<void>((resolve) => {
+      if (file.closed || file.destroyed) return resolve();
+      file.once("close", () => resolve());
+      file.once("error", () => resolve());
+    });
+    this.gzip.end();
     this.gzip = undefined;
+    this.file = undefined;
     this.hour = "";
-    if (file && !file.destroyed) await new Promise<void>((resolve) => file.once("close", () => resolve()));
+    return this.closing;
   }
 
   private async snapshot(venue: string, market: string): Promise<void> {

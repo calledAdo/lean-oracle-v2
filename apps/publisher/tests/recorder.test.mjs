@@ -139,3 +139,12 @@ test("the REST poller reports its backoff after a refusal", async () => {
   now += 30_001;
   assert.equal(poller.isBackingOff(), false);
 });
+
+test("close() flushes the open hour and is safe to call twice (stop, then shutdown)", async () => {
+  const d = dir();
+  const rec = new Recorder(new MarketData(), { dir: d });
+  rec.alive("gate", T0);
+  rec.stop();
+  await Promise.race([rec.close(), new Promise((_, no) => setTimeout(() => no(new Error("second close hung")), 2000))]);
+  assert.equal(lines(join(d, readdirSync(d)[0])).length, 1); // a complete gzip file
+});

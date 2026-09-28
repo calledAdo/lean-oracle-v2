@@ -94,3 +94,15 @@ test("skewed arrival is deterministic per simulated publisher and bounded by the
   const runs = [0, 1, 2].map((k) => replay(records, config, { shift: skew(50, k) }));
   assert.equal(divergence(runs).pass, true);
 });
+
+test("a file cut off mid-write and continued after a restart keeps both halves", async () => {
+  const { gzipSync } = await import("node:zlib");
+  const { readRecordingFile } = await import("../scripts/replay.mjs");
+  const first = gzipSync(Buffer.from(Array.from({ length: 2000 }, (_, i) => JSON.stringify({ t: "alive", ms: i, venue: "a" })).join("\n") + "\n"));
+  const cut = first.subarray(0, Math.floor(first.length * 0.7)); // killed before the flush
+  const second = gzipSync(Buffer.from(`${JSON.stringify({ t: "alive", ms: 99_999, venue: "b" })}\n`));
+  const text = readRecordingFile(Buffer.concat([cut, second]));
+  const recs = text.split("\n").filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
+  assert.ok(recs.filter((r) => r.venue === "a").length > 500, "the cut member still yields its data");
+  assert.equal(recs.at(-1).venue, "b", "the member after the restart is read");
+});

@@ -148,3 +148,24 @@ test("close() flushes the open hour and is safe to call twice (stop, then shutdo
   await Promise.race([rec.close(), new Promise((_, no) => setTimeout(() => no(new Error("second close hung")), 2000))]);
   assert.equal(lines(join(d, readdirSync(d)[0])).length, 1); // a complete gzip file
 });
+
+test("an in-flight depth response cannot reopen a closed recorder", async () => {
+  const d = dir();
+  let finish;
+  const data = new MarketData();
+  const rec = new Recorder(data, {
+    dir: d, now: () => T0,
+    depth: [{ venue: "mexc", market: "CKBUSDT" }],
+    getJson: () => new Promise((resolve) => { finish = resolve; }),
+  });
+  rec.alive("mexc", T0);
+  const pending = rec.snapshotAll();
+  await rec.close();
+  finish({ bids: [["1", "2"]], asks: [["2", "3"]] });
+  await pending;
+  rec.alive("mexc", T0 + 1);
+  await rec.close();
+  assert.equal(rec.active, false);
+  assert.equal(data.lastAliveMs("mexc"), T0 + 1, "forwarding remains independent of recording");
+  assert.deepEqual(lines(join(d, readdirSync(d)[0])).map((r) => r.t), ["alive"]);
+});

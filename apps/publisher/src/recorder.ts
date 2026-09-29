@@ -69,6 +69,7 @@ export class Recorder implements MarketDataSink {
   private blocked = false;
   private dropped = 0;
   private failed = false;
+  private closed = false;
   private closing: Promise<void> | undefined;
   private depthTimer: NodeJS.Timeout | undefined;
   private readonly depthBackoffUntil = new Map<string, number>();
@@ -82,7 +83,7 @@ export class Recorder implements MarketDataSink {
 
   /** Whether recording is still on (false after a write error). */
   get active(): boolean {
-    return !this.failed;
+    return !this.failed && !this.closed;
   }
 
   get droppedEvents(): number {
@@ -115,7 +116,7 @@ export class Recorder implements MarketDataSink {
   }
 
   startDepth(): void {
-    if (!this.o.depth?.length) return;
+    if (this.closed || !this.o.depth?.length) return;
     const every = this.o.depthEveryMs ?? DEPTH_EVERY_MS;
     this.depthTimer = setInterval(() => void this.snapshotAll(), every);
     this.depthTimer.unref();
@@ -132,6 +133,7 @@ export class Recorder implements MarketDataSink {
 
   /** Stop depth snapshots and flush the current file. Safe to call more than once. */
   close(): Promise<void> {
+    this.closed = true;
     if (this.depthTimer) clearInterval(this.depthTimer);
     const file = this.file;
     if (!this.gzip || !file) return this.closing ?? Promise.resolve();
@@ -150,7 +152,7 @@ export class Recorder implements MarketDataSink {
   private async snapshot(venue: string, market: string): Promise<void> {
     const endpoint = DEPTH_ENDPOINTS[venue];
     const key = `${venue}:${market}`;
-    if (!endpoint || this.failed || this.o.isBackingOff?.(venue) || (this.depthBackoffUntil.get(key) ?? 0) > this.now()) return;
+    if (!endpoint || this.failed || this.closed || this.o.isBackingOff?.(venue) || (this.depthBackoffUntil.get(key) ?? 0) > this.now()) return;
     try {
       const body = await (this.o.getJson ? this.o.getJson(endpoint.url(market)) : httpsGetJson(endpoint.url(market), this.o.lookup, 5000));
       const book = endpoint.parse(body);
@@ -163,7 +165,7 @@ export class Recorder implements MarketDataSink {
   }
 
   private write(record: Record<string, unknown>): void {
-    if (this.failed) return;
+    if (this.failed || this.closed) return;
     try {
       const gzip = this.stream(Number(record.ms));
       if (!gzip) return;

@@ -11,6 +11,8 @@ export interface TwapPoint {
   tickMs: bigint;
   price: bigint;
   conf: bigint;
+  /** The message's exponent: points at another scale (a later config changed it) are skipped. */
+  expo?: number;
 }
 
 /**
@@ -45,7 +47,7 @@ export function computeTwap(
 ): ObservationEntry | undefined {
   const { from, to } = twapWindow(tickMs, feed.twap.windowMs, tickPeriodMs);
   if (latestFinalizedMs === undefined || latestFinalizedMs < to) return undefined;
-  const window = points.filter((p) => p.tickMs > from && p.tickMs <= to);
+  const window = points.filter((p) => p.tickMs > from && p.tickMs <= to && (p.expo === undefined || p.expo === feed.expo));
   if (window.length < feed.twap.minTicks || window.length === 0) return undefined;
   const count = BigInt(window.length);
   const price = window.reduce((s, p) => s + p.price, 0n) / count;
@@ -63,14 +65,14 @@ export function mergeEntries(a: readonly ObservationEntry[], b: readonly Observa
 }
 
 /** Source points per feed ID from decoded finalized updates. */
-export function pointsByFeed(updates: readonly { tickMs: bigint; entries: readonly { feedId: Hex; price: bigint; conf: bigint }[] }[]): Map<string, TwapPoint[]> {
+export function pointsByFeed(updates: readonly { tickMs: bigint; entries: readonly { feedId: Hex; price: bigint; conf: bigint; expo?: number }[] }[]): Map<string, TwapPoint[]> {
   const out = new Map<string, TwapPoint[]>();
   for (const u of updates) {
     for (const e of u.entries) {
       const id = e.feedId.toLowerCase();
       const list = out.get(id) ?? [];
       out.set(id, list);
-      list.push({ tickMs: u.tickMs, price: e.price, conf: e.conf });
+      list.push({ tickMs: u.tickMs, price: e.price, conf: e.conf, ...(e.expo !== undefined ? { expo: e.expo } : {}) });
     }
   }
   return out;

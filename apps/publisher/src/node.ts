@@ -27,6 +27,9 @@ import {
   recoverSigner,
   verifyObservation,
   verifyThreshold,
+  verifyProof,
+  leafHash,
+  encodePriceMessage,
   type CommitteeConfig,
   type Hex,
   type Observation,
@@ -411,6 +414,15 @@ export class PublisherNode {
     if (!set) return;
     if (!verifyThreshold(update.signatures, priceUpdateSigningHash(header), set)) {
       this.log("finalized.bad_signatures", { tickMs: header.publishTimeMs.toString() });
+      return;
+    }
+    // The signatures cover the header's Merkle root only: every entry must be proven against it, or a
+    // relayed blob could carry altered prices into this publisher's EMA state and TWAP windows.
+    const proven =
+      update.entries.length === header.leafCount &&
+      update.entries.every(({ message, proof }) => verifyProof(header.merkleRoot, leafHash(encodePriceMessage(message)), proof));
+    if (!proven) {
+      this.log("finalized.bad_entries", { tickMs: header.publishTimeMs.toString() });
       return;
     }
     if (this.o.store.saveFinalized(update, blob)) this.tick(header.publishTimeMs).finalized = true;

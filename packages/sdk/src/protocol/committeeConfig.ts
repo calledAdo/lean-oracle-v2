@@ -85,6 +85,12 @@ export interface TwapFeedConfig extends FeedBase {
 
 export type FeedConfig = MarketFeedConfig | TwapFeedConfig;
 
+/** Every `PriceMethod` field (the type forces this list to stay complete): none may appear on a TWAP feed. */
+const MARKET_FIELDS = Object.keys({
+  method: 1, windowMs: 1, maxQuoteAgeMs: 1, maxBookAgeMs: 1, maxSpreadBps: 1, minTopNotional: 1, maxDeviationBps: 1,
+  vwapClampToBook: 1, tradeBookToleranceMs: 1, tradeBookSlackPct: 1, vwapMinWindowNotional: 1, minVenues: 1, markets: 1,
+} satisfies Record<keyof PriceMethod, 1>);
+
 export const isTwapFeed = (feed: FeedConfig): feed is TwapFeedConfig => feed.twap !== undefined;
 
 /** The feeds priced from exchanges (everything but TWAP feeds). */
@@ -170,9 +176,12 @@ export function validateCommitteeConfig(config: CommitteeConfig): string[] {
     const t = feed.twap;
     const name = feed.symbol;
     for (const field of ["windowMs", "everyMs", "minTicks"] as const) positive(`${name}.twap.${field}`, t[field]);
-    for (const field of ["method", "markets", "minVenues", "windowMs", "maxQuoteAgeMs", "maxSpreadBps"]) {
+    for (const field of MARKET_FIELDS) {
       if (field in feed) problems.push(`${name}: a TWAP feed has no ${field} (it is priced from its source)`);
     }
+    // Publishers keep at least 1 h of finalized history (retentionHours ≥ 1): a longer window could be
+    // averaged over a pruned suffix.
+    if (t.windowMs > 3_600_000) problems.push(`${name}: twap.windowMs is at most 1 hour (publisher history retention)`);
     const source = config.feeds.find((f) => f.symbol === t.source);
     if (!source) problems.push(`${name}: source ${t.source} is not a feed of this config`);
     else if (isTwapFeed(source)) problems.push(`${name}: source ${t.source} is itself a TWAP`);

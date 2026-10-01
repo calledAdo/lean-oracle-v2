@@ -131,3 +131,36 @@ test("REGRESSION: a config without TWAP feeds produces the same updates as befor
   for (let tick = T0; tick <= T0 + 12_000; tick += 1000) assert.equal(a.nodes[0].store.finalizedAt(BigInt(tick)), b.nodes[0].store.finalizedAt(BigInt(tick)));
   assert.equal(committeeConfig().feeds.some((f) => f.twap), false);
 });
+
+test("points at another exponent (a later config changed it) are skipped, never averaged", () => {
+  // 10 of 60 ticks at expo -10 (100x the value): skipped, leaving 50 ≥ minTicks at expo -8.
+  const mixed = points(60).map((pt, i) => (i < 10 ? { ...pt, price: pt.price * 100n, expo: -10 } : { ...pt, expo: -8 }));
+  const kept = points(60).slice(10).map((pt) => pt.price);
+  assert.equal(computeTwap(TWAP60, mixed, t, 1000, t).price, kept.reduce((s, x) => s + x, 0n) / 50n);
+  assert.equal(computeTwap(TWAP60, points(60).map((pt) => ({ ...pt, expo: -6 })), t, 1000, t), undefined, "no point at the feed's scale");
+});
+
+test("validation: windows over an hour and any market setting on a TWAP feed are rejected", () => {
+  const c = committeeConfig({ twap: ["Crypto.BTC/USD"] });
+  const f = c.feeds.find((x) => x.twap);
+  f.minTopNotional = 5;
+  assert.match(p.validateCommitteeConfig(c).join(), /has no minTopNotional/);
+  delete f.minTopNotional;
+  Object.assign(f, { symbol: "Crypto.BTC/USD.TWAP7200", feedId: p.feedId("Crypto.BTC/USD.TWAP7200") });
+  f.twap.windowMs = 7_200_000;
+  assert.match(p.validateCommitteeConfig(c).join(), /at most 1 hour/);
+});
+
+test("a synced blob whose entries do not match its signed Merkle root is refused", async () => {
+  const c = makeCommittee(4);
+  for (let tick = T0; tick <= T0 + 3000; tick += 1000) await c.runTick(tick, { down: tick === T0 + 3000 ? [3] : [] });
+  const hex = c.nodes[0].store.finalizedAt(BigInt(T0 + 3000));
+  const update = p.decodePriceUpdate(hex);
+  update.entries[0].message.price += 1_000_000n; // same signed header, altered price
+  const tampered = p.encodePriceUpdate(update);
+  c.nodes[3].node.acceptFinalized(tampered);
+  assert.equal(c.nodes[3].store.finalizedAt(BigInt(T0 + 3000)), undefined);
+  assert.ok(c.events.some((e) => e.index === 3 && e.event === "finalized.bad_entries"));
+  c.nodes[3].node.acceptFinalized(Uint8Array.from(Buffer.from(hex.slice(2), "hex")));
+  assert.equal(c.nodes[3].store.finalizedAt(BigInt(T0 + 3000)), hex, "the genuine blob is accepted");
+});

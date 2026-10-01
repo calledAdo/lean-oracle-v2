@@ -1,7 +1,7 @@
 //! Deterministic synthetic quotes for local committees and tests. Each publisher can apply its own
 //! `skewBps` to model honest disagreement between data sources.
 
-import type { CommitteeConfig } from "lean-oracle-sdk/protocol";
+import { marketFeeds, type CommitteeConfig } from "lean-oracle-sdk/protocol";
 
 import type { MarketDataSink } from "../marketData.js";
 
@@ -18,7 +18,7 @@ export interface MockMarket {
  */
 export function mockMarketsFor(config: CommitteeConfig, basePrices: Record<string, bigint>): MockMarket[] {
   const seen = new Map<string, MockMarket>();
-  for (const feed of config.feeds) {
+  for (const feed of marketFeeds(config.feeds)) {
     const base = basePrices[feed.symbol];
     if (base === undefined) continue;
     feed.markets.forEach((m, i) => {

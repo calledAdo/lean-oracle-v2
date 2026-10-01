@@ -13,7 +13,7 @@ import { marketsByVenue } from "../dist/sources/runner.js";
 const seconds = Number(process.argv[2] ?? 20);
 const doh = process.argv.includes("--doh");
 const templates = ["majors"].map((n) => JSON.parse(readFileSync(new URL(`../configs/${n}.template.json`, import.meta.url), "utf8")));
-const byVenue = marketsByVenue(templates.flatMap((t) => t.feeds));
+const byVenue = marketsByVenue(templates.flatMap((t) => t.feeds.filter((f) => !f.twap))); // TWAP feeds have no markets
 const counts = new Map();
 const sink = {
   alive() {},

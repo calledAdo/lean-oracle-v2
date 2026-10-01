@@ -45,6 +45,7 @@ import type { KeySigner } from "./keySigner.js";
 import { leaderOrder, NO_ANCHOR, slotOpensAt } from "./leaderOrder.js";
 import type { MarketData } from "./marketData.js";
 import { observeFeeds } from "./methodology.js";
+import { computeTwap, dueTwapFeeds, mergeEntries, pointsByFeed, twapWindow } from "./twap.js";
 import type { PublisherStore } from "./store.js";
 import type { Transport } from "./transport.js";
 import { decodeMessage, encodeMessage, proposalDigest, type PeerMessage, type ProposalBody } from "./wire.js";
@@ -133,6 +134,28 @@ export class PublisherNode {
     return row ? { tickMs: row.tickMs, hash: anchorHashOf(row.blob) } : { tickMs: 0n, hash: NO_ANCHOR };
   }
 
+  /**
+   * TWAP entries due at boundary `tickMs`, from this publisher's finalized history: the window's updates
+   * are read and decoded once for every due feed (docs/designs/twap60.md).
+   */
+  private twapEntries(config: CommitteeConfig, tickMs: bigint): ObservationEntry[] {
+    const due = dueTwapFeeds(config, tickMs);
+    if (due.length === 0) return [];
+    const widest = Math.max(...due.map((f) => f.twap.windowMs));
+    const { from, to } = twapWindow(tickMs, widest, config.tickPeriodMs);
+    const updates = this.o.store.finalizedBetween(from, to).map(({ tickMs: t, blob }) => {
+      const u = decodePriceUpdate(blob);
+      return { tickMs: t, entries: u.entries.map(({ message }) => message) };
+    });
+    const points = pointsByFeed(updates);
+    const latest = this.o.store.latestFinalizedTick();
+    const bySymbol = new Map(config.feeds.map((f) => [f.symbol, f.feedId.toLowerCase()]));
+    return due.flatMap((feed) => {
+      const entry = computeTwap(feed, points.get(bySymbol.get(feed.twap.source) ?? "") ?? [], tickMs, config.tickPeriodMs, latest);
+      return entry ? [entry] : [];
+    });
+  }
+
   /** Publisher indexes for ranks 0..maxRank at `tickMs`. */
   leaders(tickMs: bigint): number[] {
     return leaderOrder(tickMs, this.anchor(tickMs).hash, this.n).slice(0, this.maxRank + 1);
@@ -142,7 +165,7 @@ export class PublisherNode {
   async observe(tickMs: bigint): Promise<void> {
     const active = this.o.schedule.at(tickMs);
     if (!active || (this.o.publisherSet.governanceFlags & GOVERNANCE_PAUSED) !== 0) return;
-    const entries = observeFeeds(active.config, this.o.marketData, Number(tickMs));
+    const entries = mergeEntries(observeFeeds(active.config, this.o.marketData, Number(tickMs)), this.twapEntries(active.config, tickMs));
     this.o.onObserved?.(tickMs, entries);
     if (entries.length === 0) {
       this.log("observe.empty", { tickMs: tickMs.toString() });

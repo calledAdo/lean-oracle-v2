@@ -33,7 +33,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { bytesToHex, committeeConfigHash, validateCommitteeConfig, verifyCommitteeConfig, decodePublisherSetData, encodePublisherSetData, type CommitteeConfig, type Hex, type PublisherSetData } from "lean-oracle-sdk/protocol";
+import { bytesToHex, committeeConfigHash, marketFeeds, validateCommitteeConfig, verifyCommitteeConfig, decodePublisherSetData, encodePublisherSetData, type CommitteeConfig, type Hex, type PublisherSetData } from "lean-oracle-sdk/protocol";
 import { publicKeyOf, signCommitteeConfig } from "lean-oracle-sdk/publisher";
 
 import { startApi } from "./api.js";
@@ -189,7 +189,7 @@ function startRecorder(c: Loaded, marketData: MarketData, stops: (() => void)[])
   const record = c.operator.record;
   if (!record) return { sink: marketData, sourceLog: log, attach: () => {} };
   const feeds = new Set(record.depthFeeds ?? []);
-  const depth = c.schedule.all().flatMap((v) => v.config.feeds.filter((f) => feeds.has(f.symbol)).flatMap((f) => f.markets.map((m) => ({ venue: m.venue, market: m.market }))));
+  const depth = c.schedule.all().flatMap((v) => marketFeeds(v.config.feeds).filter((f) => feeds.has(f.symbol)).flatMap((f) => f.markets.map((m) => ({ venue: m.venue, market: m.market }))));
   const unique = [...new Map(depth.map((d) => [`${d.venue}:${d.market}`, d])).values()];
   let sources: SourceManager | undefined;
   const recorder = new Recorder(marketData, {
@@ -264,7 +264,7 @@ async function probeMarkets(config: CommitteeConfig, seconds: number, doh: boole
   sources.sync([config]);
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   sources.stop();
-  return config.feeds.flatMap((feed) => feed.markets.filter((m) => !heard.has(`${m.venue} ${m.market}`)).map((m) => `${feed.symbol}: ${m.venue} ${m.market}`));
+  return marketFeeds(config.feeds).flatMap((feed) => feed.markets.filter((m) => !heard.has(`${m.venue} ${m.market}`)).map((m) => `${feed.symbol}: ${m.venue} ${m.market}`));
 }
 
 async function signConfig(values: { config?: string; key?: string; set?: string; probe?: string; doh?: boolean }): Promise<void> {

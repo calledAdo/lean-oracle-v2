@@ -14,12 +14,18 @@ const feed = (symbol: string, expo: number, committee: string): FeedInfo => ({ s
  * Launch feed registry (docs/oracle-design.md section 3). Every feed is a native pair priced only from
  * markets trading that pair; derive other pairs by combining feeds (e.g. BTC/USD ÷ USDT/USD).
  */
-export const FEEDS: readonly FeedInfo[] = [
+const SPOT: readonly FeedInfo[] = [
   ...["BTC", "ETH", "SOL"].flatMap((base) => ["USD", "USDT", "USDC"].map((quote) => feed(`Crypto.${base}/${quote}`, -8, "majors"))),
   feed("Crypto.USDT/USD", -8, "majors"),
   feed("Crypto.CKB/USDT", -10, "majors"),
   feed("Crypto.CKB/USDC", -10, "majors"),
 ];
+
+/**
+ * Every spot feed plus its `.TWAP60` (docs/designs/twap60.md): the average of the source's last 60
+ * finalized 1 s prices, signed once a minute at the boundary tick, for settlement.
+ */
+export const FEEDS: readonly FeedInfo[] = [...SPOT, ...SPOT.map((f) => feed(`${f.symbol}.TWAP60`, f.expo, f.committee))];
 
 export function feedBySymbol(symbol: string): FeedInfo | undefined {
   return FEEDS.find((f) => f.symbol === symbol);

@@ -16,7 +16,13 @@ export const T0 = 1_700_000_000_000;
 const markets = (list) => list.map(([venue, market]) => ({ venue, market }));
 const method = { method: "mid", windowMs: 2000, maxQuoteAgeMs: 2000, maxSpreadBps: 50 };
 
-export function committeeConfig() {
+/** A TWAP feed over `source` (docs/designs/twap60.md); short windows keep committee tests fast. */
+export const twapFeed = (source, { windowMs = 10_000, everyMs = 10_000, minTicks = 8 } = {}) => ({
+  symbol: `${source}.TWAP${windowMs / 1000}`, quote: source.split("/")[1], feedId: p.feedId(`${source}.TWAP${windowMs / 1000}`), expo: -8,
+  toleranceBps: 50, emaHalfLifeMs: 3_600_000, twap: { source, windowMs, everyMs, minTicks },
+});
+
+export function committeeConfig({ twap = [] } = {}) {
   const feeds = [
     ["Crypto.BTC/USD", [["coinbase", "BTC-USD"], ["kraken", "BTC/USD"], ["bitstamp", "btcusd"]]],
     ["Crypto.BTC/USDT", [["binance", "BTCUSDT"], ["okx", "BTC-USDT"], ["bybit", "BTCUSDT"]]],
@@ -24,7 +30,7 @@ export function committeeConfig() {
   ].map(([symbol, list]) => ({
     symbol, quote: symbol.split("/")[1], feedId: p.feedId(symbol), expo: -8, toleranceBps: 50, emaHalfLifeMs: 3_600_000, ...method,
     minVenues: 2, markets: markets(list),
-  })).sort((a, b) => (a.feedId < b.feedId ? -1 : 1));
+  })).concat(twap.map((source) => twapFeed(source))).sort((a, b) => (a.feedId < b.feedId ? -1 : 1));
   return {
     version: 1, committee: "majors", publisherSetTypeHash: SET_TYPE_HASH, activationTickMs: String(T0),
     tickPeriodMs: 1000, observationDeadlineMs: 400, maxSigningLagMs: 3000,
@@ -42,11 +48,11 @@ export const memorySigner = (key) => ({ publicKey: pub.publicKeyOf(key), sign: a
 /** Every publisher approves `config` (a quorum is all that is needed; all is simplest). */
 export const approve = (config, keysInOrder) => ({ config, signatures: pub.toSignatureBundle(keysInOrder.map((key, i) => pub.signCommitteeConfig(config, key, i))) });
 
-export function makeCommittee(n, { skews = [], configs = [] } = {}) {
+export function makeCommittee(n, { skews = [], configs = [], twap = [] } = {}) {
   const privateKeys = Array.from({ length: n }, (_, i) => `0x${(i + 1).toString(16).padStart(2, "0").repeat(32)}`);
   const ordered = privateKeys.map((key) => ({ key, pubkey: pub.publicKeyOf(key) })).sort((a, b) => (a.pubkey < b.pubkey ? -1 : 1));
   const publisherSet = { networkId: `0x${"aa".repeat(32)}`, governanceNonce: 0n, governanceFlags: 0, minRotationIntervalS: 86_400n, current: { setIndex: 0, pubkeys: ordered.map((o) => o.pubkey) } };
-  const config = committeeConfig();
+  const config = committeeConfig({ twap });
   const configHash = p.committeeConfigHash(config);
   const keysInOrder = ordered.map((o) => o.key);
   const hub = new InMemoryHub();

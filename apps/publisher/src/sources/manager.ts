@@ -1,7 +1,7 @@
 //! Keeps one connection per venue for the union of markets across every held config version, and
 //! restarts a venue's connection when its market set changes.
 
-import type { CommitteeConfig } from "lean-oracle-sdk/protocol";
+import { marketFeeds, type CommitteeConfig } from "lean-oracle-sdk/protocol";
 
 import type { LookupFunction } from "node:net";
 
@@ -28,7 +28,7 @@ export class SourceManager {
   }
 
   sync(configs: readonly CommitteeConfig[]): void {
-    const wanted = marketsByVenue(configs.flatMap((c) => c.feeds));
+    const wanted = marketsByVenue(configs.flatMap((c) => marketFeeds(c.feeds)));
     for (const [venue, current] of this.running) {
       if (!wanted.has(venue)) {
         current.stop();

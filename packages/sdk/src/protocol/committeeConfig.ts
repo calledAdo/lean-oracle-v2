@@ -52,16 +52,43 @@ export interface PriceMethod {
   markets: MarketConfig[];
 }
 
-/** A native pair feed, e.g. `Crypto.BTC/USDT`. Consumers derive other pairs by combining feeds. */
-export interface FeedConfig extends PriceMethod {
+interface FeedBase {
   symbol: string;
-  /** Quote currency; must match the symbol's suffix. */
+  /** Quote currency; must match the symbol's suffix (a TWAP feed's: its source's). */
   quote: string;
   feedId: Hex;
   expo: number;
   toleranceBps: number;
   emaHalfLifeMs: number;
 }
+
+/** A native pair feed priced from exchanges, e.g. `Crypto.BTC/USDT`. Consumers derive other pairs by combining feeds. */
+export interface MarketFeedConfig extends FeedBase, PriceMethod {
+  twap?: undefined;
+}
+
+/**
+ * A time-weighted average of another feed's finalized prices (docs/designs/twap60.md), e.g.
+ * `Crypto.BTC/USDT.TWAP60`. Signed only at boundary ticks (`tickMs % everyMs == 0`), from the source's
+ * finalized ticks in `(t − windowMs − 2·tickPeriodMs, t − 2·tickPeriodMs]`; at least `minTicks` of them.
+ */
+export interface TwapSpec {
+  source: string;
+  windowMs: number;
+  everyMs: number;
+  minTicks: number;
+}
+
+export interface TwapFeedConfig extends FeedBase {
+  twap: TwapSpec;
+}
+
+export type FeedConfig = MarketFeedConfig | TwapFeedConfig;
+
+export const isTwapFeed = (feed: FeedConfig): feed is TwapFeedConfig => feed.twap !== undefined;
+
+/** The feeds priced from exchanges (everything but TWAP feeds). */
+export const marketFeeds = (feeds: readonly FeedConfig[]): MarketFeedConfig[] => feeds.filter((f): f is MarketFeedConfig => !isTwapFeed(f));
 
 export interface CommitteeConfig {
   version: number;
@@ -139,9 +166,33 @@ export function validateCommitteeConfig(config: CommitteeConfig): string[] {
     const venues = m.markets.map((market) => market.venue);
     if (new Set(venues).size !== venues.length) problems.push(`${name}: a venue is listed more than once`);
   };
+  const checkTwap = (feed: TwapFeedConfig) => {
+    const t = feed.twap;
+    const name = feed.symbol;
+    for (const field of ["windowMs", "everyMs", "minTicks"] as const) positive(`${name}.twap.${field}`, t[field]);
+    for (const field of ["method", "markets", "minVenues", "windowMs", "maxQuoteAgeMs", "maxSpreadBps"]) {
+      if (field in feed) problems.push(`${name}: a TWAP feed has no ${field} (it is priced from its source)`);
+    }
+    const source = config.feeds.find((f) => f.symbol === t.source);
+    if (!source) problems.push(`${name}: source ${t.source} is not a feed of this config`);
+    else if (isTwapFeed(source)) problems.push(`${name}: source ${t.source} is itself a TWAP`);
+    else {
+      if (feed.quote !== source.quote) problems.push(`${name}: quote must equal its source's (${source.quote})`);
+      if (feed.expo !== source.expo) problems.push(`${name}: expo must equal its source's (${source.expo})`);
+    }
+    if (t.windowMs % 1000 !== 0 || feed.symbol !== `${t.source}.TWAP${t.windowMs / 1000}`) {
+      problems.push(`${name}: symbol must be ${t.source}.TWAP<windowMs / 1000> (whole seconds)`);
+    }
+    if (t.windowMs % config.tickPeriodMs !== 0) problems.push(`${name}: twap.windowMs must be a multiple of tickPeriodMs`);
+    if (t.everyMs % config.tickPeriodMs !== 0) problems.push(`${name}: twap.everyMs must be a multiple of tickPeriodMs`);
+    if (t.minTicks > t.windowMs / config.tickPeriodMs) problems.push(`${name}: twap.minTicks exceeds the ticks in its window`);
+  };
   config.feeds.forEach((feed, i) => {
-    checkMethod(feed.symbol, feed);
-    if (feed.symbol.split("/").at(-1) !== feed.quote) problems.push(`${feed.symbol}: quote ${feed.quote} does not match the symbol`);
+    if (isTwapFeed(feed)) checkTwap(feed);
+    else {
+      checkMethod(feed.symbol, feed);
+      if (feed.symbol.split("/").at(-1) !== feed.quote) problems.push(`${feed.symbol}: quote ${feed.quote} does not match the symbol`);
+    }
     if (feedId(feed.symbol) !== feed.feedId) problems.push(`${feed.symbol}: feedId does not match symbol`);
     if (!Number.isInteger(feed.expo) || feed.expo < -18 || feed.expo > 18) problems.push(`${feed.symbol}: expo out of range`);
     positive(`${feed.symbol}.toleranceBps`, feed.toleranceBps);

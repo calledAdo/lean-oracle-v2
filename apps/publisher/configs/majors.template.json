@@ -455,6 +455,162 @@
           "market": "CKBUSDC"
         }
       ]
+    },
+    {
+      "symbol": "Crypto.BTC/USD.TWAP60",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.BTC/USD",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.BTC/USDT.TWAP60",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.BTC/USDT",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.BTC/USDC.TWAP60",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.BTC/USDC",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.ETH/USD.TWAP60",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.ETH/USD",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.ETH/USDT.TWAP60",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.ETH/USDT",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.ETH/USDC.TWAP60",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.ETH/USDC",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.SOL/USD.TWAP60",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.SOL/USD",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.SOL/USDT.TWAP60",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.SOL/USDT",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.SOL/USDC.TWAP60",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.SOL/USDC",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.USDT/USD.TWAP60",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 20,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.USDT/USD",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.CKB/USDT.TWAP60",
+      "quote": "USDT",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.CKB/USDT",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
+    },
+    {
+      "symbol": "Crypto.CKB/USDC.TWAP60",
+      "quote": "USDC",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "twap": {
+        "source": "Crypto.CKB/USDC",
+        "windowMs": 60000,
+        "everyMs": 60000,
+        "minTicks": 45
+      }
     }
   ]
 }

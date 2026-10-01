@@ -546,6 +546,71 @@ in parallel. Merge both, then T6 → T7.
 - Parallelization: 2 lanes, 2 parallel / 1 sequential merge
 - Lake Score: 5/5 recommended complete options chosen
 
+## T6 results (2026-10-01)
+
+Tool: `apps/publisher/scripts/t6.mjs`, a streaming pass over the archive (CKB markets only, because
+only they change).
+
+**Data.**
+- 74 hourly files, Sep 27 07:00 to Sep 30 08:00 UTC.
+- 49 clean hours: at least 3,590 recorded ticks, and the replay matches the recorded live price
+  within 1 bp on at least 99% of ticks. Over those hours the match is exact: 333,857 CKB
+  feed-ticks, 0 beyond 1 bp.
+- 25 lossy hours, mostly Sep 28 03:00 to 19:00 UTC (as few as 1,551 of 3,600 ticks recorded at
+  14:00). The publisher kept signing: the mirror holds about 3,400 signed USDT/USD updates in those
+  hours. The recorder dropped events because gzip could not keep up on the 1-vCPU droplet. Lossy
+  hours feed the market state but are not measured.
+
+**Candidates vs the v1 baseline**, on clean hours (targets: within v1's conf on at least 99% of
+ticks; at most 1% omitted):
+
+| Candidate | Feed | Within v1 conf | Omitted | Mean / max change |
+|---|---|---|---|---|
+| clamp + WS filter (500 ms, slack 1× median half-spread) + $10 floor | CKB/USDT | 98.16% ✗ | 1.35% ✗ | 1.02 / 53.6 bp |
+| same | CKB/USDC | 98.35% ✗ | 1.76% ✗ | 0.59 / 49.9 bp |
+| **clamp + WS filter, no floor** | CKB/USDT | **99.12% ✓** | **0% ✓** | 0.49 / 53.6 bp |
+| **clamp + WS filter, no floor** | CKB/USDC | **99.36% ✓** | **0.01% ✓** | 0.24 / 49.9 bp |
+
+Why the floor fails: below $10 a venue falls back to `mid`, which also requires `minTopNotional`.
+Thin books (Gate CKB/USDC) then drop out, and the feed is omitted. The clamp already bounds what
+thin-venue trades can do, so the floor is dropped.
+
+**Filter activity, no-floor candidate.** Per CKB/USDT venue, the share of trade notional the
+websocket filter rejected and the share of samples where the clamp moved the VWAP:
+
+| Venue | Rejected | Clamp active |
+|---|---|---|
+| Binance | 1.6% | 15% |
+| Gate | 6.3% | 53% |
+| Bitget | 6.8% | 23% |
+| KuCoin | 9.2% | 23% |
+| MEXC (REST, no filter) | n/a | 13% |
+
+**Cost to move 1%** (median notional within 1% of the mid, thin side, 20 four-hour buckets):
+
+| Feed | Cheapest venues | Rough cost of a majority |
+|---|---|---|
+| CKB/USDT | Gate $2.7k, KuCoin $3.2k, Bitget $5.0k (Binance $8.9k, MEXC $9.8k) | about $10.9k for 3 of 5 |
+| CKB/USDC | Gate $310, Binance $1.8k (MEXC $9.2k) | about $2.1k for 2 of 3 |
+
+CKB/USDC is weakly protected. No methodology fixes that; its venue set does.
+
+**Follow-through.**
+- There were too few 1% moves in 60 s on Binance, so the threshold fell back to 0.5%, giving 42
+  events.
+- Median share of the Binance move shown by Gate, Bitget and KuCoin 5 s later: 0.79. That is above
+  the pre-registered 70%, so the reviewer's challenge holds: arbitrage links the venues.
+- So venue weighting is not worth building. Time smoothing (TWAP60) is the next lever, and the
+  real cost to move the median is below the sum of the books.
+
+**Decisions this informs.**
+- (a) v2 for both CKB feeds: clamp + websocket filter (`tradeBookToleranceMs` 500,
+  `tradeBookSlackPct` 100), no floor.
+- (b) No depth filter or venue caps (follow-through makes them weak); the backlog item closes.
+- (c) CKB/USDC needs more venues or a consumer warning.
+- (d) The recorder loses data under load. It needs cheaper compression, or to record only the CKB
+  markets, before any further recording.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |

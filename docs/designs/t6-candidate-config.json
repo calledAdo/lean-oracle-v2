@@ -1,0 +1,481 @@
+{
+  "version": 1,
+  "publisherSetTypeHash": "0xf5ed9644d2100a1d588222b8f80236be3579a7b735ae83c5a82063c94ef6faff",
+  "activationTickMs": "1790461994000",
+  "committee": "majors",
+  "tickPeriodMs": 1000,
+  "observationDeadlineMs": 400,
+  "maxSigningLagMs": 3000,
+  "feeds": [
+    {
+      "symbol": "Crypto.ETH/USDC",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "ETHUSDC"
+        },
+        {
+          "venue": "okx",
+          "market": "ETH-USDC"
+        },
+        {
+          "venue": "bybit",
+          "market": "ETHUSDC"
+        },
+        {
+          "venue": "kraken",
+          "market": "ETH/USDC"
+        },
+        {
+          "venue": "bitget",
+          "market": "ETHUSDC"
+        },
+        {
+          "venue": "kucoin",
+          "market": "ETH-USDC"
+        },
+        {
+          "venue": "mexc",
+          "market": "ETHUSDC"
+        },
+        {
+          "venue": "gate",
+          "market": "ETH_USDC"
+        }
+      ],
+      "feedId": "0x0012885bd7eaf706dfcab851cf7dca1e7aeb36a26cebb5b619efa57d7a71ed27"
+    },
+    {
+      "symbol": "Crypto.CKB/USDC",
+      "quote": "USDC",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "method": "vwap",
+      "windowMs": 60000,
+      "maxQuoteAgeMs": 60000,
+      "maxSpreadBps": 300,
+      "minVenues": 2,
+      "maxDeviationBps": 300,
+      "minTopNotional": 20,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "CKBUSDC"
+        },
+        {
+          "venue": "gate",
+          "market": "CKB_USDC"
+        },
+        {
+          "venue": "mexc",
+          "market": "CKBUSDC"
+        }
+      ],
+      "feedId": "0x0e10a123dbd200e2d94ae00116739a2422981e36974dc086c9f2fe4da7f50d28",
+      "vwapClampToBook": true,
+      "tradeBookToleranceMs": 500,
+      "tradeBookSlackPct": 100
+    },
+    {
+      "symbol": "Crypto.BTC/USDC",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "BTCUSDC"
+        },
+        {
+          "venue": "okx",
+          "market": "BTC-USDC"
+        },
+        {
+          "venue": "bybit",
+          "market": "BTCUSDC"
+        },
+        {
+          "venue": "kraken",
+          "market": "BTC/USDC"
+        },
+        {
+          "venue": "bitget",
+          "market": "BTCUSDC"
+        },
+        {
+          "venue": "kucoin",
+          "market": "BTC-USDC"
+        },
+        {
+          "venue": "mexc",
+          "market": "BTCUSDC"
+        },
+        {
+          "venue": "gate",
+          "market": "BTC_USDC"
+        }
+      ],
+      "feedId": "0x308b2dd5263b3259c48c3664c6ae3d5622e7c20f4dfcf28bb42ad75d5dc297ec"
+    },
+    {
+      "symbol": "Crypto.CKB/USDT",
+      "quote": "USDT",
+      "expo": -10,
+      "toleranceBps": 200,
+      "emaHalfLifeMs": 3600000,
+      "method": "vwap",
+      "windowMs": 60000,
+      "maxQuoteAgeMs": 60000,
+      "maxSpreadBps": 300,
+      "minVenues": 3,
+      "maxDeviationBps": 300,
+      "minTopNotional": 20,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "CKBUSDT"
+        },
+        {
+          "venue": "gate",
+          "market": "CKB_USDT"
+        },
+        {
+          "venue": "bitget",
+          "market": "CKBUSDT"
+        },
+        {
+          "venue": "kucoin",
+          "market": "CKB-USDT"
+        },
+        {
+          "venue": "mexc",
+          "market": "CKBUSDT"
+        }
+      ],
+      "feedId": "0x40dc997a966b5c929fd7b98e4c3612cf7b84a16f4c1a0484908f54e97a69e9aa",
+      "vwapClampToBook": true,
+      "tradeBookToleranceMs": 500,
+      "tradeBookSlackPct": 100
+    },
+    {
+      "symbol": "Crypto.BTC/USDT",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "BTCUSDT"
+        },
+        {
+          "venue": "okx",
+          "market": "BTC-USDT"
+        },
+        {
+          "venue": "bybit",
+          "market": "BTCUSDT"
+        },
+        {
+          "venue": "gate",
+          "market": "BTC_USDT"
+        },
+        {
+          "venue": "bitget",
+          "market": "BTCUSDT"
+        },
+        {
+          "venue": "kucoin",
+          "market": "BTC-USDT"
+        },
+        {
+          "venue": "mexc",
+          "market": "BTCUSDT"
+        }
+      ],
+      "feedId": "0x41b321889dda10bf82257b5b0fc5f5dab57936694de2953f74d7a616a299821b"
+    },
+    {
+      "symbol": "Crypto.SOL/USDT",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "SOLUSDT"
+        },
+        {
+          "venue": "okx",
+          "market": "SOL-USDT"
+        },
+        {
+          "venue": "bybit",
+          "market": "SOLUSDT"
+        },
+        {
+          "venue": "gate",
+          "market": "SOL_USDT"
+        },
+        {
+          "venue": "bitget",
+          "market": "SOLUSDT"
+        },
+        {
+          "venue": "kucoin",
+          "market": "SOL-USDT"
+        },
+        {
+          "venue": "mexc",
+          "market": "SOLUSDT"
+        }
+      ],
+      "feedId": "0x55e226d62a26fe1c9ad5781231e4637813af5f2d33ec1974e86e41b3751a2595"
+    },
+    {
+      "symbol": "Crypto.USDT/USD",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 20,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 10,
+      "minVenues": 2,
+      "maxDeviationBps": 30,
+      "minTopNotional": 1000,
+      "markets": [
+        {
+          "venue": "coinbase",
+          "market": "USDT-USD"
+        },
+        {
+          "venue": "kraken",
+          "market": "USDT/USD"
+        },
+        {
+          "venue": "bitstamp",
+          "market": "usdtusd"
+        }
+      ],
+      "feedId": "0x5abdcfc753c20f51d59c9b80b2aa38bd2af8f0499f59c8f7a21a388ea9302167"
+    },
+    {
+      "symbol": "Crypto.ETH/USDT",
+      "quote": "USDT",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "ETHUSDT"
+        },
+        {
+          "venue": "okx",
+          "market": "ETH-USDT"
+        },
+        {
+          "venue": "bybit",
+          "market": "ETHUSDT"
+        },
+        {
+          "venue": "gate",
+          "market": "ETH_USDT"
+        },
+        {
+          "venue": "bitget",
+          "market": "ETHUSDT"
+        },
+        {
+          "venue": "kucoin",
+          "market": "ETH-USDT"
+        },
+        {
+          "venue": "mexc",
+          "market": "ETHUSDT"
+        }
+      ],
+      "feedId": "0x8110339dbbb3c0cc0f77eac7762938e7207f04632694b7f78e75f1e74cf34f21"
+    },
+    {
+      "symbol": "Crypto.SOL/USDC",
+      "quote": "USDC",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 3,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "binance",
+          "market": "SOLUSDC"
+        },
+        {
+          "venue": "okx",
+          "market": "SOL-USDC"
+        },
+        {
+          "venue": "bybit",
+          "market": "SOLUSDC"
+        },
+        {
+          "venue": "kraken",
+          "market": "SOL/USDC"
+        },
+        {
+          "venue": "bitget",
+          "market": "SOLUSDC"
+        },
+        {
+          "venue": "kucoin",
+          "market": "SOL-USDC"
+        },
+        {
+          "venue": "mexc",
+          "market": "SOLUSDC"
+        },
+        {
+          "venue": "gate",
+          "market": "SOL_USDC"
+        }
+      ],
+      "feedId": "0xa6bbd6ce90c6427c15733dde0893c10bdb731f9aba33ddd01129165bd7a82309"
+    },
+    {
+      "symbol": "Crypto.ETH/USD",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 2,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "coinbase",
+          "market": "ETH-USD"
+        },
+        {
+          "venue": "kraken",
+          "market": "ETH/USD"
+        },
+        {
+          "venue": "bitstamp",
+          "market": "ethusd"
+        }
+      ],
+      "feedId": "0xd24b085680b6c834e7426758af4b61e16d9be1db0608612a6b48caba422e4837"
+    },
+    {
+      "symbol": "Crypto.SOL/USD",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 2,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "coinbase",
+          "market": "SOL-USD"
+        },
+        {
+          "venue": "kraken",
+          "market": "SOL/USD"
+        },
+        {
+          "venue": "bitstamp",
+          "market": "solusd"
+        }
+      ],
+      "feedId": "0xf22c5f4e75d4ed2227bf93463f36cf1bca60925c96881183224ed9f71c0e8228"
+    },
+    {
+      "symbol": "Crypto.BTC/USD",
+      "quote": "USD",
+      "expo": -8,
+      "toleranceBps": 50,
+      "emaHalfLifeMs": 3600000,
+      "method": "mid",
+      "windowMs": 1000,
+      "maxQuoteAgeMs": 2000,
+      "maxSpreadBps": 50,
+      "minVenues": 2,
+      "maxDeviationBps": 100,
+      "minTopNotional": 100,
+      "markets": [
+        {
+          "venue": "coinbase",
+          "market": "BTC-USD"
+        },
+        {
+          "venue": "kraken",
+          "market": "BTC/USD"
+        },
+        {
+          "venue": "bitstamp",
+          "market": "btcusd"
+        }
+      ],
+      "feedId": "0xfe8a5418f48a04df0125567e7167e9ed88878284689a292d4aa69491744e6c5b"
+    }
+  ]
+}

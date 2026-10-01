@@ -6,7 +6,7 @@
 //! `maxDeviationBps`, take the median again. `conf = max(median half-spread, median absolute
 //! deviation)`. Every market trades exactly the feed's pair, so no currency conversion is done.
 
-import type { CommitteeConfig, MarketConfig, ObservationEntry, PriceMethod } from "lean-oracle-sdk/protocol";
+import { marketFeeds, type CommitteeConfig, type MarketConfig, type ObservationEntry, type PriceMethod } from "lean-oracle-sdk/protocol";
 
 import { abs, median, ONE, toExpo } from "./fixed.js";
 import type { MarketData, Quote, Trade } from "./marketData.js";
@@ -164,7 +164,7 @@ function aggregate(data: MarketData, method: PriceMethod, tickMs: number): Aggre
 /** This publisher's observation entries for every feed it can price at `tickMs` (ascending feed id). */
 export function observeFeeds(config: CommitteeConfig, data: MarketData, tickMs: number): ObservationEntry[] {
   const entries: ObservationEntry[] = [];
-  for (const feed of config.feeds) {
+  for (const feed of marketFeeds(config.feeds)) {
     const result = aggregate(data, feed, tickMs);
     if (!result) continue;
     const price = toExpo(result.price, feed.expo);

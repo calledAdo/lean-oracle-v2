@@ -18,6 +18,18 @@
     "sol-usdc",
     "usdt-usd",
     "ckb-usdt",
-    "ckb-usdc"
+    "ckb-usdc",
+    "btc-usd-twap60",
+    "btc-usdt-twap60",
+    "btc-usdc-twap60",
+    "eth-usd-twap60",
+    "eth-usdt-twap60",
+    "eth-usdc-twap60",
+    "sol-usd-twap60",
+    "sol-usdt-twap60",
+    "sol-usdc-twap60",
+    "usdt-usd-twap60",
+    "ckb-usdt-twap60",
+    "ckb-usdc-twap60"
   ]
 }

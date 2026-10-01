@@ -95,12 +95,27 @@ export function FeedDetail({ symbol }: { symbol: string }) {
             <Row k="Exponent"><span className="font-mono text-[13px]">{f.expo}</span> <span className="text-muted-foreground">(value = price × 10^{f.expo})</span></Row>
             <Row k="Committee"><a className="underline underline-offset-4" href="/docs/feeds/committees">{f.committee}</a></Row>
             <Row k="Committee type hash (testnet)"><CopyValue value={c.typeHash} /></Row>
-            <Row k="Update frequency">Every {secs(f.tickPeriodMs)}</Row>
+            <Row k="Update frequency">Every {secs(f.twap ? f.twap.everyMs : f.tickPeriodMs)}</Row>
             <Row k="Market hours">24/7</Row>
           </tbody>
         </table>
       </div>
 
+      {f.twap ? (
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="bg-card px-4 py-2.5 text-[13px] font-medium">Methodology</div>
+        <table className="w-full text-sm">
+          <tbody>
+            <Row k="Source feed"><span className="font-mono text-[13px]">{f.twap.source}</span></Row>
+            <Row k="Window">{secs(f.twap.windowMs)} of finalized prices, ending 2 s before the boundary</Row>
+            <Row k="Published">Every {secs(f.twap.everyMs)}, at the boundary tick</Row>
+            <Row k="Minimum seconds with a price">{f.twap.minTicks} of {f.twap.windowMs / f.tickPeriodMs}</Row>
+            <Row k="Publisher agreement tolerance">{bps(f.toleranceBps)}</Row>
+            <Row k="EMA half-life">{secs(f.emaHalfLifeMs)}</Row>
+          </tbody>
+        </table>
+      </div>
+      ) : (<>
       <div className="overflow-x-auto rounded-xl border border-border">
         <div className="bg-card px-4 py-2.5 text-[13px] font-medium">Methodology</div>
         <table className="w-full text-sm">
@@ -127,6 +142,7 @@ export function FeedDetail({ symbol }: { symbol: string }) {
           </tbody>
         </table>
       </div>
+      </>)}
 
       <Tabs items={["TypeScript", "Rust"]}>
         <Tab value="TypeScript">

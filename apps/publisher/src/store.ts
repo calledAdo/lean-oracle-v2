@@ -131,6 +131,13 @@ export class PublisherStore {
     return row && bytesToHex(row.blob);
   }
 
+  /** Finalized updates with `fromMs < tick ≤ toMs`, oldest first (TWAP windows). */
+  finalizedBetween(fromMs: bigint, toMs: bigint): { tickMs: bigint; blob: Uint8Array }[] {
+    return (this.db
+      .prepare("SELECT tick_ms, blob FROM finalized WHERE committee = ? AND tick_ms > ? AND tick_ms <= ? ORDER BY tick_ms")
+      .all(this.committee, fromMs, toMs) as { tick_ms: number | bigint; blob: Uint8Array }[]).map((r) => ({ tickMs: BigInt(r.tick_ms), blob: r.blob }));
+  }
+
   /** Finalized blobs with tick > `afterMs`, oldest first. */
   finalizedAfter(afterMs: bigint, limit: number): Hex[] {
     return (this.db

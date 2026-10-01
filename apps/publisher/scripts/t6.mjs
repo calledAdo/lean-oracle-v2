@@ -38,7 +38,7 @@ const medianNum = (xs) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(
 const pct = (n, d) => (d === 0 ? null : Math.round((n / d) * 10000) / 100);
 
 /** Every line of one hourly file, member by member (cut-off members yield what they hold). */
-async function eachLine(buffer, onLine) {
+export async function eachLine(buffer, onLine) {
   const starts = [];
   for (let i = buffer.indexOf(GZIP_HEADER); i !== -1; i = buffer.indexOf(GZIP_HEADER, i + 1)) starts.push(i);
   for (let k = 0; k < starts.length; k++) {

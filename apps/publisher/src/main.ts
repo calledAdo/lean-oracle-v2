@@ -127,6 +127,7 @@ async function run(configPath: string): Promise<void> {
     log("publisher.stopping");
     scheduler.stop();
     for (const stop of stops) stop();
+    await recording.recorder?.close(); // flush the open hour: a cut-off file loses its tail
     api.close();
     await transport.close();
     store.close();

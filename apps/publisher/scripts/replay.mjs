@@ -17,24 +17,44 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { gunzipSync } from "node:zlib";
+import { constants, gunzipSync } from "node:zlib";
 
 import { MarketData } from "../dist/marketData.js";
 import { observeFeeds } from "../dist/methodology.js";
 
 const big = (v) => (v === undefined ? undefined : BigInt(v));
 
+/**
+ * The header Node's gzip writes (deflate, no flags, mtime 0, no extra flags), minus the last byte,
+ * which names the OS (3 on Linux, other values elsewhere): where each member starts.
+ */
+const GZIP_HEADER = Buffer.from("1f8b08000000000000", "hex");
+
+/**
+ * Decompress a recording file member by member. A publisher that stops without flushing leaves a
+ * cut-off member, and after a restart the same hour's file continues with a new member; each member
+ * yields everything it holds, so neither the cut nor the open hour loses the rest of the file.
+ */
+export function readRecordingFile(buffer) {
+  const starts = [];
+  for (let i = buffer.indexOf(GZIP_HEADER); i !== -1; i = buffer.indexOf(GZIP_HEADER, i + 1)) starts.push(i);
+  return starts
+    .map((start, k) => {
+      try {
+        return gunzipSync(buffer.subarray(start, starts[k + 1] ?? buffer.length), { finishFlush: constants.Z_SYNC_FLUSH }).toString();
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+}
+
 /** Every record of every `rec-*.ndjson.gz` in `dir`, oldest file first, in write order. */
 export function readRecording(dir) {
   const files = readdirSync(dir).filter((f) => /^rec-\d{10}\.ndjson\.gz$/.test(f)).sort();
   const records = [];
   for (const f of files) {
-    let text;
-    try {
-      text = gunzipSync(readFileSync(join(dir, f)), { finishFlush: 2 /* Z_SYNC_FLUSH: tolerate the open hour */ }).toString();
-    } catch {
-      continue;
-    }
+    const text = readRecordingFile(readFileSync(join(dir, f)));
     for (const line of text.split("\n")) {
       if (!line) continue;
       try {

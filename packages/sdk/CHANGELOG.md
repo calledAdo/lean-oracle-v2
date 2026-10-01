@@ -5,6 +5,14 @@
 - Committee-config `PriceMethod` gains optional `vwapClampToBook`, `tradeBookToleranceMs` and
   `tradeBookSlackPct` (together), and `vwapMinWindowNotional`; `validateCommitteeConfig` checks them.
   Configs without them are unchanged (docs/designs/manipulation-resistant-pricing.md).
+- TWAP feeds (docs/designs/twap60.md):
+  - `FeedConfig` is now `MarketFeedConfig | TwapFeedConfig`, where a TWAP feed carries
+    `twap { source, windowMs, everyMs, minTicks }` and no markets.
+  - New helpers: `isTwapFeed`, `marketFeeds`.
+  - Validation: the source must exist and not be a TWAP; the symbol must be `<source>.TWAP<seconds>`;
+    `quote` and `expo` must equal the source's; the window and schedule must be tick multiples; the
+    window is at most 1 h; no market fields.
+  - `FEEDS` presets list a `.TWAP60` for every spot feed.
 
 ## 2.0.0 (2026-09-26)
 

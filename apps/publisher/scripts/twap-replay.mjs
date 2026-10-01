@@ -16,7 +16,7 @@ const { values } = parseArgs({ options: { dir: { type: "string" }, config: { typ
 const config = (() => { const j = JSON.parse(readFileSync(values.config, "utf8")); return j.config ?? j; })();
 const hours = values.hours ? new Set(readFileSync(values.hours, "utf8").split("\n").filter(Boolean)) : undefined;
 const spotFeeds = config.feeds.filter((f) => !f.twap);
-const twapOf = new Map(spotFeeds.map((f) => [f.feedId, { symbol: `${f.symbol}.TWAP60`, feedId: f.feedId, expo: f.expo, twap: { source: f.symbol, windowMs: 60_000, everyMs: 60_000, minTicks: 45 } }]));
+const twapOf = new Map(spotFeeds.map((f) => [f.feedId, { symbol: `${f.symbol}.TWAP60`, feedId: f.feedId, expo: f.expo, twap: { source: f.symbol, windowMs: 60_000, everyMs: 60_000, minTicks: Number(process.env.MIN_TICKS ?? 45) } }]));
 
 const history = new Map(); // feedId → [{ tickMs, price, conf }] last ~70 s
 const stats = new Map();

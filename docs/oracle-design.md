@@ -197,6 +197,26 @@ feeds itself, e.g. CKB/USD = CKB/USDT × USDT/USD (both come from the same commi
 carries both). USDC/USD is not a launch feed: only Kraken and
 Bitstamp trade it natively, one short of the rules above.
 
+### 4.1 TWAP feeds
+
+A TWAP feed `S.TWAP<s>` (for example `Crypto.CKB/USDT.TWAP60`) is the average of feed `S`'s
+**finalized** prices. It is designed in docs/designs/twap60.md, and every spot feed has a `.TWAP60`
+since config v3.
+- **When:** only at boundary ticks, `t % everyMs == 0`.
+- **Window:** `(t − windowMs − 2·tick, t − 2·tick]`, the same two-tick lag as the leader-order anchor.
+  The TWAP labelled 12:05:00 covers 12:03:59 to 12:04:58.
+- **Price:** `floor(mean)`, equal weight per finalized tick, gaps skipped.
+- **conf:** `max(mean conf, MAD of the window's prices)`.
+- **When there is none:** a publisher observes a TWAP only with at least `minTicks` (45) window ticks
+  at the feed's exponent, and only if synced through the window end. Otherwise it sits the boundary
+  out.
+- **Aggregation:** like any feed. A boundary whose chosen observations carry fewer than a quorum of
+  TWAPs has no TWAP leaf; consumers treat it as VOID under their own rules.
+
+On the recorded testnet data, the majors are VOID in under 0.6% of minutes. CKB/USDT is VOID in
+about 9%, because its spot feed itself drops out in stretches. Settlement should use the TWAP, not a
+single second.
+
 ## 5. Off-chain signing protocol (one canonical update per tick)
 
 The rule to guarantee: **at most one valid update exists per (committee, tick)**. Without it,

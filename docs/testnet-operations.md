@@ -44,10 +44,24 @@ rsync -a root@64.227.40.35:/var/lib/docker/volumes/lean-oracle_majors-data-v3/_d
   recovery, and sends a summary daily at 08:00 UTC. Its secrets live in `watchdog.env` (mode 600:
   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); start it with
   `docker compose --profile alerts up -d watchdog`.
-- **Backups:** `backup.sh` ([source](../ops/testnet/backup.sh)) runs from cron at 03:30 UTC. It takes
-  SQLite online backups of the mirror and the publisher store into `backups/<date>/`, keeps 7
-  days, and alerts on Telegram if a backup fails. Backups stay on the droplet; copy them off it
-  (or enable DigitalOcean droplet backups) to survive losing the droplet.
+- **Backups:** `backup.sh` ([source](../ops/testnet/backup.sh)) runs from cron at 03:30 UTC and
+  takes about 3–4 minutes. It writes `backups/<date>/`:
+  - `publisher.sqlite.gz`: the whole publisher store (double-sign guard, key sets, EMA state);
+  - `mirror-24h.sqlite.gz`: the mirror's last 24 hours plus all equivocation evidence. Older mirror
+    history is not backed up: it serves replays, and a restored mirror refills the last day from
+    the publishers.
+
+  Copies are consistent single-transaction snapshots (`VACUUM INTO`) at the lowest CPU priority.
+  SQLite's `.backup`, used until 2026-10-01, restarted on every mirror write and ran for up to 17
+  hours, starving the 1-vCPU droplet. Each copy is integrity-checked before it is kept. The 3 newest
+  days are kept (by folder name), about 650 MB in total. A failure alerts on Telegram. Copy them off
+  the droplet daily, since a lost droplet takes local backups with it:
+
+  ```bash
+  rsync -a root@64.227.40.35:/opt/lean-oracle/backups/ ~/lean-backups/
+  ```
+
+  DigitalOcean droplet backups are an alternative (a paid setting on the droplet).
 
 ## Everyday commands
 

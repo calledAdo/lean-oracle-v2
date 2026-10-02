@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 (unreleased)
+## 2.1.0 (2026-10-02)
 
 - Committee-config `PriceMethod` gains optional `vwapClampToBook`, `tradeBookToleranceMs` and
   `tradeBookSlackPct` (together), and `vwapMinWindowNotional`; `validateCommitteeConfig` checks them.

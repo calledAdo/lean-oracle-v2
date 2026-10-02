@@ -2,13 +2,13 @@
 
 TypeScript SDK for **Lean Oracle**, a pull price oracle for [Nervos CKB](https://www.nervos.org/).
 
-A committee of publishers signs prices every tick (1 s for majors, 2 s for CKB). Prices are
+A committee of publishers signs prices every second, with a 60 s TWAP of each feed once a minute. Prices are
 Merkle-batched and quorum-signed, and served by public mirrors. Any project moves its **own** feed
 cell forward with a signed update; the on-chain script verifies the committee's signatures, so no
 one has to be trusted to relay prices.
 
-> **1.x replaces 0.x.** `lean-oracle-sdk` 0.x (Pyth/Hermes-based) is a different protocol and is not
-> compatible. See [Migrating from 0.x](#migrating-from-0x).
+> **1.x and later replace 0.x.** `lean-oracle-sdk` 0.x (Pyth/Hermes-based) is a different protocol and is
+> not compatible. See [Migrating from 0.x](#migrating-from-0x).
 
 ## Install
 
@@ -78,12 +78,22 @@ A feed ID is `ckb_hash("LEAN/FEED/V1" || symbol)`. Pass symbols or IDs anywhere 
 Every feed is a **native pair**, priced only from markets that trade exactly that pair; derive other
 pairs by combining feeds (for example CKB/USD = CKB/USDT × USDT/USD).
 
-| Committee | Feeds | Exponent |
-|---|---|---|
-| `majors` (1 s) | BTC, ETH, SOL × /USD, /USDT, /USDC; USDT/USD | -8 |
-| `ckb` (2 s) | CKB/USDT, CKB/USDC | -10 |
+All feeds are signed by one committee, `majors`, every 1 s:
+
+| Feeds | Exponent |
+|---|---|
+| BTC, ETH, SOL × /USD, /USDT, /USDC; USDT/USD | -8 |
+| CKB/USDT, CKB/USDC | -10 |
+| `<feed>.TWAP60` for each of the 12 above, e.g. `Crypto.CKB/USDT.TWAP60` | as its source |
 
 Each price carries `conf`, an EMA, `sourceTimeMs` and the number of publishers.
+
+A **TWAP60** feed is published only at minute boundaries (`publishTimeMs % 60000 == 0`). Its price
+is the mean of the source feed's committee-signed prices from t−61 s to t−2 s, and its `conf` is at
+least the window's median absolute deviation. A boundary can lack a TWAP (VOID) when publishers
+hold fewer than 45 of the window's ticks; settle on the TWAP rather than a single second, and decide
+what VOID means for your contract. `isTwapFeed` and `marketFeeds` tell the two kinds apart in a
+committee config.
 
 ## Trust model
 
@@ -103,7 +113,7 @@ Each price carries `conf`, an EMA, `sourceTimeMs` and the number of publishers.
 
 ## Migrating from 0.x
 
-0.x relayed Pyth prices (Hermes, Wormhole guardian sets) into shared oracle cells. 1.x has its own
+0.x relayed Pyth prices (Hermes, Wormhole guardian sets) into shared oracle cells. 1.x and later have their own
 publisher committees and per-project feed cells. There is no drop-in upgrade path:
 
 - `LeanOracleTestnetClient` still exists, now with `latestPrices`, `createFeedCell` and `pullAndUpdate`.

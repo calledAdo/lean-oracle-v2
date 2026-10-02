@@ -142,19 +142,34 @@ export class MirrorStore {
    * Equivocation evidence is kept forever.
    */
   prune(beforeMs: bigint, batch = 5000): number {
+    // Every delete walks a primary key from its leading column; a bare `tick_ms < ?` scans the
+    // whole table and blocks the HTTP server for tens of seconds on a multi-GB store.
+    const drop = this.db.prepare(
+      "DELETE FROM updates WHERE rowid IN (SELECT rowid FROM updates WHERE committee = ? AND tick_ms < ? LIMIT ?)");
     let removed = 0;
-    for (;;) {
-      const n = Number(this.db
-        .prepare("DELETE FROM updates WHERE rowid IN (SELECT rowid FROM updates WHERE tick_ms < ? LIMIT ?)")
-        .run(beforeMs, batch).changes);
-      removed += n;
-      if (n < batch) break;
+    for (const committee of this.distinct("SELECT committee AS v FROM updates WHERE committee > ? ORDER BY committee LIMIT 1")) {
+      for (;;) {
+        const n = Number(drop.run(committee, beforeMs, batch).changes);
+        removed += n;
+        if (n < batch) break;
+      }
     }
-    // Per feed and committee, so each delete walks the primary key (feed_id, committee, tick_ms).
-    const keys = this.db.prepare("SELECT DISTINCT feed_id, committee FROM feed_ticks").all() as { feed_id: string; committee: string }[];
-    const drop = this.db.prepare("DELETE FROM feed_ticks WHERE feed_id = ? AND committee = ? AND tick_ms < ?");
-    for (const k of keys) drop.run(k.feed_id, k.committee, beforeMs);
+    const dropTicks = this.db.prepare("DELETE FROM feed_ticks WHERE feed_id = ? AND committee = ? AND tick_ms < ?");
+    const committees = this.db.prepare("SELECT committee FROM feed_ticks WHERE feed_id = ? AND committee > ? ORDER BY committee LIMIT 1");
+    for (const feedId of this.distinct("SELECT feed_id AS v FROM feed_ticks WHERE feed_id > ? ORDER BY feed_id LIMIT 1")) {
+      for (let c = committees.get(feedId, "") as { committee: string } | undefined; c; c = committees.get(feedId, c.committee) as typeof c) {
+        dropTicks.run(feedId, c.committee, beforeMs);
+      }
+    }
     return removed;
+  }
+
+  /** Distinct values of an indexed leading column by skip-scan; `sql` selects the next value after `?` as `v`. */
+  private distinct(sql: string): string[] {
+    const next = this.db.prepare(sql);
+    const out: string[] = [];
+    for (let row = next.get("") as { v: string } | undefined; row; row = next.get(row.v) as typeof row) out.push(row.v);
+    return out;
   }
 
   close(): void {

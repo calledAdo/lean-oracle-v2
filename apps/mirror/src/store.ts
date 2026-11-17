@@ -120,11 +120,19 @@ export class MirrorStore {
 
   /** Feeds seen, with the committee and latest tick of each. */
   feeds(): { feedId: Hex; committee: Hex; latestTickMs: bigint }[] {
-    return (this.db.prepare("SELECT feed_id, committee, MAX(tick_ms) AS tick FROM feed_ticks GROUP BY feed_id, committee ORDER BY feed_id").all() as {
-      feed_id: string;
-      committee: string;
-      tick: number | bigint;
-    }[]).map((row) => ({ feedId: row.feed_id as Hex, committee: row.committee as Hex, latestTickMs: BigInt(row.tick) }));
+    // GROUP BY/MAX walks every historical index entry and blocks the HTTP event loop.
+    // Seek each distinct key and its newest tick instead: work scales with the catalogue,
+    // not the retention window. Read the existing index so backfill/pruning need no cache.
+    const committees = this.db.prepare("SELECT committee FROM feed_ticks WHERE feed_id = ? AND committee > ? ORDER BY committee LIMIT 1");
+    const latest = this.db.prepare("SELECT tick_ms FROM feed_ticks WHERE feed_id = ? AND committee = ? ORDER BY tick_ms DESC LIMIT 1");
+    const out: { feedId: Hex; committee: Hex; latestTickMs: bigint }[] = [];
+    for (const feedId of this.distinct("SELECT feed_id AS v FROM feed_ticks WHERE feed_id > ? ORDER BY feed_id LIMIT 1")) {
+      for (let c = committees.get(feedId, "") as { committee: string } | undefined; c; c = committees.get(feedId, c.committee) as typeof c) {
+        const row = latest.get(feedId, c.committee) as { tick_ms: number | bigint };
+        out.push({ feedId: feedId as Hex, committee: c.committee as Hex, latestTickMs: BigInt(row.tick_ms) });
+      }
+    }
+    return out;
   }
 
   equivocations(limit: number): Equivocation[] {

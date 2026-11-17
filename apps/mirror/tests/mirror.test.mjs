@@ -224,3 +224,30 @@ test("retention prunes old updates and their feed index, keeps equivocation evid
   assert.equal(store.feeds().find((f) => f.feedId === btc)?.latestTickMs, BigInt(T0 + 3000));
   store.close();
 });
+
+test("catalogue, health and bounded reads remain correct while verified updates arrive", async () => {
+  const { c, mirror, url, stop } = await setup();
+  try {
+    await waitFor(() => mirror.store.latestTick(SET_TYPE_HASH) === BigInt(T0 + 2000), "initial history");
+    const paths = ["/health", "/v1/feeds", `/v1/updates/latest?ids=${encodeURIComponent(BTC_USDT)}`,
+      `/v1/updates/range?id=${encodeURIComponent(BTC_USDT)}&from=${T0}&to=${T0 + 10000}&limit=3`];
+    for (let i = 3; i < 6; i++) {
+      const reads = paths.map(async (path) => {
+        const response = await fetch(url + path, { signal: AbortSignal.timeout(3000) });
+        assert.equal(response.status, 200);
+        return response.json();
+      });
+      await c.runTick(T0 + i * 1000);
+      const [health, catalogue, latest, range] = await Promise.all(reads);
+      assert.equal(health.committees[0].ready, true);
+      assert.ok(catalogue.feeds.some(f => f.feedId === p.feedId(BTC_USDT)));
+      assert.equal(latest.updates.length, 1);
+      assert.equal(range.updates.length, 3);
+      for (const update of [...latest.updates, ...range.updates])
+        p.verifyPriceUpdate(p.hexToBytes(update.blob), p.feedId(BTC_USDT), SET_TYPE_HASH, c.publisherSet);
+      await waitFor(() => mirror.store.latestTick(SET_TYPE_HASH) === BigInt(T0 + i * 1000), "ingestion during reads");
+    }
+    const catalogue = await (await fetch(url + "/v1/feeds")).json();
+    assert.ok(catalogue.feeds.every(f => f.latestTickMs === String(T0 + 5000)));
+  } finally { await stop(); }
+});
